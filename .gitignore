@@ -1,0 +1,12 @@
+# Rust
+/target/
+.cargo/config.toml
+
+# IDE's
+.vscode
+
+# Server storage (e.g., webpages)
+/content/
+
+# Scripts
+deploy.bat
