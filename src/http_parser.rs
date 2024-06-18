@@ -526,6 +526,32 @@ impl HttpTarget {
         self.path = Some(new_path);
     }
 
+    pub fn n_directories(&self, directories: usize) -> Option<&str> {
+        if let None = self.path {
+            return None
+        }
+        let directory_delimiter = '/';
+        let full_path = &self.path.as_ref().expect("`path` should be `Some`")[..];
+        let mut unprocessed_path = &full_path[..];
+        let mut found_directories = 0;
+        let mut last_directory_separator_index = 0;
+        while unprocessed_path.len() > 0 {
+            match unprocessed_path.find(directory_delimiter) {
+                None => return None,
+                Some(index) => {
+                    found_directories += 1;
+                    last_directory_separator_index += index;
+                    if found_directories >= directories {
+                        return Some(&full_path[..=last_directory_separator_index])
+                    }
+                    let new_start_index = if last_directory_separator_index >= unprocessed_path.len() { unprocessed_path.len() } else { last_directory_separator_index + 1 };
+                    unprocessed_path = &unprocessed_path[new_start_index..];
+                },
+            }
+        };
+        None
+    }
+
     fn get_directory_and_filename(&self) -> (Option<&str>, Option<&str>) {
         let directory_delimiter = '/';
         let filename_extension_delimiter = '.';

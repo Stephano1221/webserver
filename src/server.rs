@@ -8,6 +8,7 @@ pub struct Config {
     pub subdomain_directory: String,
     pub socket: SocketAddr,
     pub request_default_filename: String,
+    pub not_found_filename: String,
 }
 
 pub fn get_response<'a>(config: &Config, http_request: &'a mut Result<HttpRequest, (io::Error, HttpStatusCode)>) -> (Option<HttpResponse>) {
@@ -28,7 +29,13 @@ pub fn get_response<'a>(config: &Config, http_request: &'a mut Result<HttpReques
                 HttpMethod::Trace => http_trace(config, request),
             };
             match result {
-                Err((response, error)) => (Some(response)),
+                Err((mut response, error)) => {
+                    match response.status_code {
+                        HttpStatusCode::NotFound404 => set_body_not_found(config, request, &mut response),
+                        _ => ()
+                    }
+                    (Some(response))
+                },
                 Ok(response) => (Some(response)),
             }
         }
@@ -59,7 +66,7 @@ fn http_get(config: &Config, http_request: &mut HttpRequest) -> Result<HttpRespo
 }
 
 fn http_head(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    format_directory(config, http_request);
+    add_target_prefix(config, http_request);
     set_filename_if_none(http_request, &config.request_default_filename);
     let http_version = http_request.version.as_ref().expect("`http_request.version` should be `Some`");
     let path = http_request.target.as_ref().expect("`http_request.target` should be `Some`").path.as_ref().expect("`http_request.target.path` should be `Some`");
@@ -111,7 +118,44 @@ fn not_implemented(config: &Config, http_request: &mut HttpRequest) -> Result<Ht
     Err((HttpResponse::new(http_version, &HttpStatusCode::NotImplemented501, &None, &None), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
 }
 
-fn format_directory(config: &Config, http_request: &mut HttpRequest) {
+fn set_body_not_found(config: &Config, http_request: &HttpRequest, http_response: &mut HttpResponse) {
+    let not_found_path = get_not_found_path(config, http_request);
+    let mut file = match OpenOptions::new().read(true).open(not_found_path) {
+        Err(error) => return,
+        Ok(file) => file,
+    };
+    let mut body = vec!();
+    let bytes = match file.read_to_end(&mut body) {
+        Err(error) => return,
+        Ok(bytes) => bytes,
+    };
+    if http_response.header.is_none() {
+        http_response.header = Some(HttpHeader::new());
+    };
+    let mut header = http_response.header.as_mut().expect("`http_response.header` should be `Some`");
+    header.insert(HttpFieldName::ContentLength.to_string().as_str(), bytes.to_string().as_str());
+    http_response.body = Some(body);
+}
+
+fn get_not_found_path(config: &Config, http_request: &HttpRequest) -> String {
+    let directory_delimiter = '/';
+    let mut path;
+    if http_request.target.is_none() || http_request.target.as_ref().expect("`http_request.target` should be `Some`").path.is_none() {
+        path = get_target_prefix(config);
+    } else {
+        path = match http_request.target.as_ref().expect("`http_request.target` should be `Some`").n_directories(2) {
+            None => get_target_prefix(config),
+            Some(dir) => dir.to_owned(),
+        }
+    }
+    if !path.ends_with(directory_delimiter) {
+        path.push(directory_delimiter);
+    }
+    path.push_str(&config.not_found_filename);
+    path
+}
+
+fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
     let target = match &http_request.target {
         None => &HttpTarget::new(),
         Some(target) => target,
@@ -120,9 +164,13 @@ fn format_directory(config: &Config, http_request: &mut HttpRequest) {
         None => String::new(),
         Some(path) => path.to_owned(),
     };
-    let prefix = format!("{}/{}", config.content_directory, config.root_directory);
+    let prefix = get_target_prefix(config);
     path.insert_str(0, &prefix);
     http_request.target.as_mut().expect("`http_request.target` should be `Some`").path = Some(path);
+}
+
+fn get_target_prefix(config: &Config) -> String {
+    format!("{}/{}", config.content_directory, config.root_directory)
 }
 
 fn set_filename(http_request: &mut HttpRequest, filename: &str) {
