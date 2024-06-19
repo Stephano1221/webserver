@@ -17,7 +17,7 @@ impl HttpProtocol {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HttpMethod {
     Get,
     Head,
@@ -62,7 +62,7 @@ impl fmt::Display for HttpMethod {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HttpVersion {
     Http1Dot1
 }
@@ -112,7 +112,7 @@ impl fmt::Display for HttpFieldName {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HttpHeader(HashMap<String, String>);
 
 impl HttpHeader {
@@ -131,7 +131,7 @@ impl HttpHeader {
                 Some(index) => index,
             };
             let field_name = &unprocessed_bytes[..field_name_separator_index];
-            let new_start_index = if field_name_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_name_separator_index + 1 };
+            let new_start_index = if field_name_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_name_separator_index + field_name_delimiter.len() };
             unprocessed_bytes = &unprocessed_bytes[new_start_index..];
 
             let field_value_separator_index = match bytes::find(unprocessed_bytes, line_delimiter) {
@@ -139,19 +139,19 @@ impl HttpHeader {
                 Some(index) => index,
             };
             let field_value = &unprocessed_bytes[..field_value_separator_index];
-            let new_start_index = if field_value_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_value_separator_index + 1 };
+            let new_start_index = if field_value_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_value_separator_index + line_delimiter.len() };
             unprocessed_bytes = &unprocessed_bytes[new_start_index..];
 
             let field_name = match std::str::from_utf8(field_name) {
                 Err(_) => continue,
-                Ok(field_name) => field_name.to_owned(),
+                Ok(field_name) => field_name.trim(),
             };
             let field_value = match std::str::from_utf8(field_value) {
                 Err(_) => continue,
-                Ok(field_value) => field_value,
+                Ok(field_value) => field_value.trim(),
             };
 
-            match fields.entry(field_name) {
+            match fields.entry(field_name.to_owned()) {
                 hash_map::Entry::Vacant(entry) => { entry.insert(field_value.to_owned()); },
                 hash_map::Entry::Occupied(mut entry) => {
                     // let old_value = entry.get();
@@ -390,7 +390,7 @@ impl fmt::Display for HttpStatusCode {
 //     }
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TargetParameters(HashMap<String, Vec<String>>);
 
 impl TargetParameters {
@@ -444,7 +444,7 @@ impl TargetParameters {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct HttpTarget {
     pub path: Option<String>,
     pub parameters: Option<TargetParameters>,
@@ -587,7 +587,7 @@ impl PartialHttpRequest<'_> {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct HttpRequest<'a> {
     pub method: Option<HttpMethod>,
     pub target: Option<HttpTarget>,
