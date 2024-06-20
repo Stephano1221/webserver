@@ -1,6 +1,6 @@
-use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::SocketAddr};
+use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::{SocketAddr, TcpStream}};
 
-use crate::http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion, PartialHttpRequest};
+use crate::{http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion, PartialHttpRequest}, network};
 
 pub struct Config {
     pub content_directory: String,
@@ -11,6 +11,19 @@ pub struct Config {
     pub request_maximum_buffer_size_kilobytes: usize,
     pub request_default_filename: String,
     pub not_found_filename: String,
+}
+
+pub fn handle_request(config: &Config, stream: &mut TcpStream, http_request: &mut Result<HttpRequest, (io::Error, HttpStatusCode)>) {
+    let (http_response) = get_response(config, http_request);
+    match &http_response {
+        None => return,
+        Some(response) => {
+            match send_response(stream, &response) {
+                Err(_error) => todo!(),
+                Ok(()) => return,
+            }
+        },
+    }
 }
 
 pub fn get_response<'a>(config: &Config, http_request: &'a mut Result<HttpRequest, (io::Error, HttpStatusCode)>) -> (Option<HttpResponse>) {
@@ -62,7 +75,7 @@ fn http_get(config: &Config, http_request: &mut HttpRequest) -> Result<HttpRespo
     if http_response.header.is_none() {
         http_response.header = Some(HttpHeader::new());
     };
-    
+
     let mut header = http_response.header.as_mut().expect("`http_response.header` should be `Some`");
     header.insert(HttpFieldName::ContentLength.to_string().as_str(), bytes.to_string().as_str());
     http_response.body = Some(body);
@@ -125,6 +138,12 @@ pub fn request_too_large_response(config: &Config, partial_http_request: &Partia
         Some(version) => version,
     };
     HttpResponse::new(http_version, &HttpStatusCode::ContentTooLarge413, &None, &None)
+}
+
+pub fn send_response(stream: &mut TcpStream, http_response: &HttpResponse) -> Result<(), Box<dyn Error>> {
+    println!("Response: {}", http_response.to_string());
+    network::send_bytes(stream, &http_response.as_bytes())?;
+    Ok(())
 }
 
 fn set_body_not_found(config: &Config, http_request: &HttpRequest, http_response: &mut HttpResponse) {
