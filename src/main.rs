@@ -1,9 +1,9 @@
 use std::net::SocketAddr;
 
-use webserver::{http_parser, network, server};
+use webserver::{http_parser::HttpProtocol, network, server};
 
 fn main() {
-    let http_protocol = http_parser::HttpProtocol::Http;
+    let http_protocol = HttpProtocol::Http;
     let port = http_protocol.port();
     let local_ipv4_address = network::get_local_ipv4_address();
     let config = server::Config {
