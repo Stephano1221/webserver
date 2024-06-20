@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::{hash_map, HashMap}, io::{self, BufWriter, Read}};
+use std::{collections::{hash_map, HashMap}, io::{self}};
 
 use crate::helper::{bytes, enums::Processing};
 
@@ -679,7 +679,7 @@ impl HttpRequest<'_> {
                 None => return Processing::InProgress(partial_request),
                 Some(before_delimiter) => match HttpHeader::from_bytes(before_delimiter) {
                     None => None,
-                    Some(header) => (Some(header)),
+                    Some(header) => Some(header),
                 },
             }
         }

@@ -16,5 +16,5 @@ fn main() {
         request_default_filename: "index.html".to_owned(),
         not_found_filename: "404.html".to_owned(),
     };
-    network::start_listener(&config);
+    server::start_server(&config);
 }

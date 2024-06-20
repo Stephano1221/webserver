@@ -13,8 +13,12 @@ pub struct Config {
     pub not_found_filename: String,
 }
 
+pub fn start_server(config: &Config) {
+    network::start_listener(config);
+}
+
 pub fn handle_request(config: &Config, stream: &mut TcpStream, http_request: &mut Result<HttpRequest, (io::Error, HttpStatusCode)>) {
-    let (http_response) = get_response(config, http_request);
+    let http_response = get_response(config, http_request);
     match &http_response {
         None => return,
         Some(response) => {
@@ -26,7 +30,7 @@ pub fn handle_request(config: &Config, stream: &mut TcpStream, http_request: &mu
     }
 }
 
-pub fn get_response<'a>(config: &Config, http_request: &'a mut Result<HttpRequest, (io::Error, HttpStatusCode)>) -> (Option<HttpResponse>) {
+pub fn get_response<'a>(config: &Config, http_request: &'a mut Result<HttpRequest, (io::Error, HttpStatusCode)>) -> Option<HttpResponse> {
     match http_request {
         Err((error, status_code)) => { Some(HttpResponse::new(&HttpVersion::Http1Dot1, &status_code, &None, &None)) }
         Ok(request) => {
@@ -76,7 +80,7 @@ fn http_get(config: &Config, http_request: &mut HttpRequest) -> Result<HttpRespo
         http_response.header = Some(HttpHeader::new());
     };
 
-    let mut header = http_response.header.as_mut().expect("`http_response.header` should be `Some`");
+    let header = http_response.header.as_mut().expect("`http_response.header` should be `Some`");
     header.insert(HttpFieldName::ContentLength.to_string().as_str(), bytes.to_string().as_str());
     http_response.body = Some(body);
     Ok(http_response)
@@ -87,17 +91,21 @@ fn http_head(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResp
     add_target_prefix(config, http_request);
     set_filename_if_none(http_request, &config.request_default_filename);
     let http_version = http_request.version.as_ref().expect("`http_request.version` should be `Some`");
+
     let path = http_request.target.as_ref().expect("`http_request.target` should be `Some`").path.as_ref().expect("`http_request.target.path` should be `Some`");
     let file = match OpenOptions::new().read(true).open(path) {
         Err(error) => return Err((HttpResponse::new(http_version, &HttpStatusCode::from_io_error(&error), &None, &None), Box::new(error))),
         Ok(file) => file,
     };
+
     let metadata = match file.metadata() {
         Err(error) => return Err((HttpResponse::new(http_version, &HttpStatusCode::from_io_error(&error), &None, &None), Box::new(error))),
         Ok(metadata) => metadata,
     };
+
     let mut http_header = HttpHeader::new();
     http_header.insert(HttpFieldName::ContentLength.to_string().as_str(), metadata.len().to_string().as_str());
+
     Ok(HttpResponse {
         version: http_version.clone(),
         status_code: HttpStatusCode::OK200,
@@ -108,31 +116,35 @@ fn http_head(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResp
 }
 
 fn http_post(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    Err((not_implemented_response(config, http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
+    Err((not_implemented_response(http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
 }
 
 fn http_put(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    Err((not_implemented_response(config, http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
+    Err((not_implemented_response(http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
 }
 
 fn http_delete(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    Err((not_implemented_response(config, http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))}
+    Err((not_implemented_response(http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
+}
 
 fn http_connect(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    Err((not_implemented_response(config, http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))}
+    Err((not_implemented_response(http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
+}
 
 fn http_options(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    Err((not_implemented_response(config, http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))}
+    Err((not_implemented_response(http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
+}
 
 fn http_trace(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    Err((not_implemented_response(config, http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))}
+    Err((not_implemented_response(http_request), Box::new(io::Error::new(io::ErrorKind::Other, ""))))
+}
 
-fn not_implemented_response(config: &Config, http_request: &mut HttpRequest) -> HttpResponse {
+fn not_implemented_response(http_request: &mut HttpRequest) -> HttpResponse {
     let http_version = http_request.version.as_ref().expect("`http_request.version` should be `Some`");
     HttpResponse::new(http_version, &HttpStatusCode::NotImplemented501, &None, &None)
 }
 
-pub fn request_too_large_response(config: &Config, partial_http_request: &PartialHttpRequest) -> HttpResponse {
+pub fn request_too_large_response(partial_http_request: &PartialHttpRequest) -> HttpResponse {
     let http_version = match partial_http_request.version().as_ref() {
         None => &HttpVersion::Http1Dot1,
         Some(version) => version,
@@ -152,16 +164,20 @@ fn set_body_not_found(config: &Config, http_request: &HttpRequest, http_response
         Err(error) => return,
         Ok(file) => file,
     };
+
     let mut body = vec!();
     let bytes = match file.read_to_end(&mut body) {
         Err(error) => return,
         Ok(bytes) => bytes,
     };
+
     if http_response.header.is_none() {
         http_response.header = Some(HttpHeader::new());
     };
-    let mut header = http_response.header.as_mut().expect("`http_response.header` should be `Some`");
+
+    let header = http_response.header.as_mut().expect("`http_response.header` should be `Some`");
     header.insert(HttpFieldName::ContentLength.to_string().as_str(), bytes.to_string().as_str());
+
     http_response.body = Some(body);
 }
 
@@ -176,6 +192,7 @@ fn get_not_found_path(config: &Config, http_request: &HttpRequest) -> String {
             Some(dir) => dir.to_owned(),
         }
     }
+
     if !path.ends_with(directory_delimiter) {
         path.push(directory_delimiter);
     }
@@ -188,10 +205,12 @@ fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
         None => &HttpTarget::new(),
         Some(target) => target,
     };
+
     let mut path = match &target.path {
         None => String::new(),
         Some(path) => path.to_owned(),
     };
+    
     let prefix = get_target_prefix(config);
     path.insert_str(0, &prefix);
     http_request.target.as_mut().expect("`http_request.target` should be `Some`").path = Some(path);
