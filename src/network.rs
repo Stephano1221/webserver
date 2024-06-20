@@ -26,11 +26,12 @@ fn accept_connection(config: &server::Config, mut stream: TcpStream) {
 
     let mut buf_reader = BufReader::new(&mut stream);
     const BYTES_IN_KILOBYTE: usize = 1024;
-    const BUFFER_SIZE_KILOBYTES: usize = 16;
-    const BUFFER_SIZE_BYTES: usize = BYTES_IN_KILOBYTE * BUFFER_SIZE_KILOBYTES;
-    let mut buf = [0u8; BUFFER_SIZE_BYTES];
+    let buffer_size_bytes = BYTES_IN_KILOBYTE * config.request_initial_buffer_size_kilobytes;
+    let buffer_maximum_size_bytes = BYTES_IN_KILOBYTE * config.request_maximum_buffer_size_kilobytes;
+    let mut buf = vec!(0; buffer_size_bytes);
     let mut buf_received_bytes = 0;
     let mut http_request = PartialHttpRequest::new();
+
     let mut http_request = loop {
         let bytes_read = buf_reader.read(&mut buf);
         if let Err(error) = bytes_read {
@@ -39,12 +40,17 @@ fn accept_connection(config: &server::Config, mut stream: TcpStream) {
                 _ => return,
             }
         }
-        buf_received_bytes += bytes_read.expect("`bytes_read` should always be `Ok` here");
+        buf_received_bytes += bytes_read.expect("`bytes_read` should be `Ok` here");
+        if buf_received_bytes > buffer_maximum_size_bytes {
+            handle_request(config, &mut stream, &mut Err((io::ErrorKind::Other.into(), HttpStatusCode::ContentTooLarge413)));
+            return
+        }
         match HttpRequest::try_parse(&mut http_request, &buf) {
             Processing::InProgress(_) => continue,
             Processing::Finished(result) => break result
         }
     };
+    
     handle_request(config, &mut stream, &mut http_request);
 }
 

@@ -585,6 +585,10 @@ impl PartialHttpRequest<'_> {
             next_byte: 0
         }
     }
+
+    pub fn version(&self) -> &Option<HttpVersion> {
+        &self.request.version
+    }
 }
 
 #[derive(Clone, Default, Debug)]

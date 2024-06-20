@@ -11,6 +11,8 @@ fn main() {
         root_directory: "root".to_owned(),
         subdomain_directory: "sobdomains".to_owned(),
         socket: SocketAddr::new(local_ipv4_address, port),
+        request_initial_buffer_size_kilobytes: 16,
+        request_maximum_buffer_size_kilobytes: 1024,
         request_default_filename: "index.html".to_owned(),
         not_found_filename: "404.html".to_owned(),
     };
