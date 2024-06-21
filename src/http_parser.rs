@@ -1,15 +1,15 @@
 mod http_protocol;
-pub mod http_method;
-pub mod http_version;
-pub mod http_fieldname;
-pub mod http_header;
-pub mod http_status_code;
-pub mod http_target_parameters;
-pub mod http_target;
-pub mod http_partial_request;
-pub mod http_request;
-pub mod http_response;
-pub mod filepath;
+mod http_method;
+mod http_version;
+mod http_fieldname;
+mod http_header;
+mod http_status_code;
+mod http_target_parameters;
+mod http_target;
+mod http_partial_request;
+mod http_request;
+mod http_response;
+mod filepath;
 
 pub use crate::http_parser::{
     http_protocol::HttpProtocol,

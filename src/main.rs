@@ -7,9 +7,10 @@ fn main() {
     let port = http_protocol.port();
     let local_ipv4_address = network::get_local_ipv4_address();
     let config = server::Config {
-        content_directory: "content".to_owned(),
+        domain_names: vec!("example.com".to_owned(), "www.example.com".to_owned()),
+        top_directory: "content".to_owned(),
         root_directory: "root".to_owned(),
-        subdomain_directory: "sobdomains".to_owned(),
+        subdomain_directory: "subdomains".to_owned(),
         socket: SocketAddr::new(local_ipv4_address, port),
         request_initial_buffer_size_kilobytes: 16,
         request_maximum_buffer_size_kilobytes: 1024,

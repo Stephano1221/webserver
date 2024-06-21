@@ -82,6 +82,15 @@ impl HttpTarget {
         self.path = Some(new_path);
     }
 
+    pub fn directory_count(&self) -> usize {
+        if let None = self.path {
+            return 0
+        }
+        let directory_delimiter = '/';
+        let full_path = &self.path.as_ref().expect("`path` should be `Some`")[..];
+        full_path.chars().filter(|c| *c == directory_delimiter).count()
+    }
+
     pub fn n_directories(&self, directories: usize) -> Option<&str> {
         if let None = self.path {
             return None
@@ -100,7 +109,12 @@ impl HttpTarget {
                     if found_directories >= directories {
                         return Some(&full_path[..=last_directory_separator_index])
                     }
-                    let new_start_index = if last_directory_separator_index >= unprocessed_path.len() { unprocessed_path.len() } else { last_directory_separator_index + 1 };
+                    let new_start_index = if last_directory_separator_index >= unprocessed_path.len() {
+                        unprocessed_path.len()
+                    } else {
+                        last_directory_separator_index += 1;
+                        last_directory_separator_index
+                    };
                     unprocessed_path = &unprocessed_path[new_start_index..];
                 },
             }

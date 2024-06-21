@@ -120,6 +120,36 @@ impl HttpRequest<'_> {
         Processing::Finished(Ok(partial_request.request))
     }
 
+    pub fn subdomain(&self, domain_names: Vec<&str>) -> Option<&str> {
+        if let None = self.header {
+            return None
+        }
+        let header = self.header.as_ref().expect("`self.header` should be `Some`");
+        let host = match header.get_value(HttpFieldName::Host.to_string().as_str()) {
+            None => return None,
+            Some(host) => host,
+        };
+        let subdomain_delimiter = '.';
+        for domain_name in domain_names {
+            match host.find(domain_name) {
+                None => continue,
+                Some(index) => {
+                    return if index > 0 {
+                        let subdomain = &host[..index];
+                        if subdomain.ends_with(subdomain_delimiter) {
+                            Some(&subdomain[..(subdomain.len() - subdomain_delimiter.len_utf8())])
+                        } else {
+                            Some(subdomain)
+                        }
+                    } else {
+                        None
+                    }
+                },
+            }
+        }
+        None
+    }
+
     // pub fn get_target_filepath(&self) -> Filepath {
     //     let file_path = match &self.target {
     //         None => return Filepath::empty(),

@@ -62,6 +62,10 @@ impl HttpHeader {
         }
     }
 
+    pub fn get_value(&self, key: &str) -> Option<&String> {
+        self.0.get(key)
+    }
+
     pub fn insert(&mut self, key: &str, value: &str) {
         self.0.insert(key.to_owned(), value.to_owned());
     }
