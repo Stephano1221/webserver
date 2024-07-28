@@ -1,6 +1,6 @@
 use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::{SocketAddr, TcpStream}};
 
-use crate::{http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion, PartialHttpRequest}, network};
+use crate::{http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion}, network};
 
 pub struct Config {
     pub domain_names: Vec<String>,
@@ -12,6 +12,7 @@ pub struct Config {
     pub request_maximum_buffer_size_kilobytes: usize,
     pub request_default_filename: String,
     pub not_found_filename: String,
+    pub request_timeout_seconds: usize,
 }
 
 /// Starts the server with the specified configuration

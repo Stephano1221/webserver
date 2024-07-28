@@ -54,7 +54,7 @@ impl HttpStatusCode {
         // Errors commented out below are unstable.
         match error.kind() {
             io::ErrorKind::NotFound => Self::NotFound404,
-            io::ErrorKind::PermissionDenied => Self::Forbidden403,
+            io::ErrorKind::PermissionDenied => Self::NotFound404, // Don't use Forbidden403: prevent attackers from learning which files exist
             io::ErrorKind::ConnectionRefused => Self::BadGateway502,
             io::ErrorKind::ConnectionReset => Self::BadGateway502,
             //io::ErrorKind::HostUnreachable => todo!(),

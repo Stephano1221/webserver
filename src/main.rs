@@ -16,6 +16,7 @@ fn main() {
         request_maximum_buffer_size_kilobytes: 1024,
         request_default_filename: "index.html".to_owned(),
         not_found_filename: "404.html".to_owned(),
+        request_timeout_seconds: 5,
     };
     server::start_server(&config);
 }
