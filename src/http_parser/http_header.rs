@@ -1,5 +1,8 @@
 use core::fmt;
-use std::collections::{hash_map, HashMap};
+use std::collections::{
+    hash_map,
+    HashMap
+};
 
 use crate::helper::bytes;
 

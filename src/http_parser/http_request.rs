@@ -121,7 +121,7 @@ impl HttpRequest<'_> {
     }
 
     pub fn subdomain(&self, domain_names: Vec<&str>) -> Option<&str> {
-        if let None = self.header {
+        if self.header.is_none() {
             return None
         }
         let header = self.header.as_ref().expect("`self.header` should be `Some`");

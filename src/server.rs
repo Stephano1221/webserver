@@ -1,19 +1,15 @@
-use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::{SocketAddr, TcpStream}};
+use std::{
+    error::Error,
+    fs::OpenOptions,
+    io::{self, Read},
+    net::TcpStream
+};
 
-use crate::{http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion}, network};
-
-pub struct Config {
-    pub domain_names: Vec<String>,
-    pub top_directory: String,
-    pub root_directory: String,
-    pub subdomain_directory: String,
-    pub socket: SocketAddr,
-    pub request_initial_buffer_size_kilobytes: usize,
-    pub request_maximum_buffer_size_kilobytes: usize,
-    pub request_default_filename: String,
-    pub not_found_filename: String,
-    pub request_timeout_seconds: usize,
-}
+use crate::{
+    config::Config,
+    http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion},
+    network
+};
 
 /// Starts the server with the specified configuration
 pub fn start_server(config: &Config) {
