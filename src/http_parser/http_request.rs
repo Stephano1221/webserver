@@ -41,7 +41,7 @@ impl HttpRequest<'_> {
         let word_delimiter = b" ";
         let line_delimiter = b"\r\n";
         let body_delimiter = b"\r\n\r\n";
-        let bad_request = Processing::Finished(Err((io::ErrorKind::InvalidInput.into(), HttpStatusCode::NotImplemented501)));
+        let bad_request = Processing::Finished(Err((io::ErrorKind::InvalidInput.into(), HttpStatusCode::BadRequest400)));
         let not_implemented = Processing::Finished(Err((io::ErrorKind::InvalidInput.into(), HttpStatusCode::NotImplemented501)));
 
         // Method
@@ -104,10 +104,14 @@ impl HttpRequest<'_> {
                 Some(header) => {
                     match header.0.entry(HttpFieldName::ContentLength.to_string()) {
                         hash_map::Entry::Vacant(_) => None,
-                        hash_map::Entry::Occupied(length) => {
-                            match length.get().parse() {
+                        hash_map::Entry::Occupied(entry) => {
+                            match entry.get().parse::<usize>() {
                                 Err(_) => return bad_request,
-                                Ok(end_index) => {
+                                Ok(content_length) => {
+                                    let end_index = partial_request.next_byte + content_length;
+                                    if request_bytes.len() < end_index {
+                                        return Processing::InProgress(partial_request)
+                                    }
                                     Some(&request_bytes[partial_request.next_byte..end_index])
                                 },
                             }
