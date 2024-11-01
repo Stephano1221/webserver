@@ -15,28 +15,26 @@ impl HttpTarget {
         }
     }
 
-    pub fn from_str(target: &str) -> Result<Self, ()> {
+    pub fn from_str(target: &str) -> Option<Self> {
+        if target.is_empty() {
+            return None
+        }
+        
         let parameter_delimiter = '?';
         // let filepath = match Filepath::from_str(target) {
         //     Err(_) => None,
         //     Ok(path) => Some(path),
         // };
         let path = match target.split_once(parameter_delimiter) {
-            None => Some(target.to_owned()),
-            Some((path, _)) => Some(path.to_owned()),
+            None => target.to_owned(),
+            Some((path, _)) => path.to_owned(),
         };
-        let parameters = match HttpTargetParameters::from_str(target) {
-            Err(_) => None,
-            Ok(parameters) => Some(parameters),
-        };
-        if !path.is_none() || !parameters.is_none() {
-            Ok(HttpTarget {
-                path,
-                parameters,
-            })
-        } else {
-            Err(())
-        }
+        let parameters = HttpTargetParameters::from_str(target);
+
+        Some(HttpTarget {
+            path: Some(path),
+            parameters,
+        })
     }
 
     pub fn directory(&self) -> Option<&str> {

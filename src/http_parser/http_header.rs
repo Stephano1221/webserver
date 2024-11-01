@@ -75,8 +75,9 @@ impl fmt::Display for HttpHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut output = String::new();
         for (key, value) in &self.0 {
-            output.push_str(&format!("{key}: {value}"));
+            output.push_str(&format!("{key}: {value}\n"));
         }
+        let _ = output.split_off(output.len() - 1);
         write!(f, "{output}")
     }
 }
