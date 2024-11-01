@@ -33,7 +33,8 @@ impl HttpRequest<'_> {
     /// # Bad Data
     /// If the request doesn't contain a full, understood request header (method, target
     /// and HTTP version), this function will return a [`Processing<Finished<Result<(Error, HttpStatusCode)>>>`]
-    /// with a recommended [`HttpStatusCode`]. If field names are unknown, the field will be ignored.
+    /// with a recommended [`HttpStatusCode`].
+    /// If field names are unknown, the field will be ignored.
     /// If field names or field values contain non-UTF8 characters, the entire field line will be ignored.
     /// No parsing will be done on the body.
     pub fn try_parse<'a>(partial_request: &PartialHttpRequest<'a>, request_bytes: &'a [u8]) -> Processing<PartialHttpRequest<'a>, Result<HttpRequest<'a>, (io::Error, HttpStatusCode)>> {
@@ -65,8 +66,8 @@ impl HttpRequest<'_> {
                 Some(before_delimiter) => match std::str::from_utf8(before_delimiter) {
                     Err(_) => return not_implemented,
                     Ok(slice) => match HttpTarget::from_str(slice) {
-                        Err(_) => return not_implemented,
-                        Ok(target) => Some(target),
+                        None => return bad_request,
+                        Some(target) => Some(target),
                     },
                 },
             }
