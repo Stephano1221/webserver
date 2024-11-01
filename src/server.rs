@@ -116,6 +116,9 @@ fn http_head(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResp
 
     let mut http_header = HttpHeader::new();
     http_header.insert(HttpFieldName::ContentLength.to_string().as_str(), metadata.len().to_string().as_str());
+    if path.ends_with(".js") || path.ends_with(".mjs") {
+        http_header.insert(HttpFieldName::ContentType.to_string().as_str(), "text/javascript");
+    }
 
     Ok(HttpResponse {
         version: http_version.clone(),
@@ -231,7 +234,6 @@ fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
 /// let path = subdomain_as_path(subdomain);
 /// assert_eq!("shop/uk", path);
 /// ```
-/// 
 fn subdomain_as_path(subdomain: &str) -> String {
     let subdomain_delimiter = '.';
     let path_separator = '/';
