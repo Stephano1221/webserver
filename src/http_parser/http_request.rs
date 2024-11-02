@@ -648,4 +648,69 @@ mod tests {
             assert_eq!(result, expected_result);
         }
     }
+    mod find_until {
+        use super::super::*;
+
+        #[test]
+        fn first_space() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b" ";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = Some(&request_bytes[..3]);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn second_space() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b" ";
+
+            HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = Some(&request_bytes[4..=4]);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn not_found() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b"Nonexistant";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = None;
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn empty_request_bytes() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"";
+            let delimiter = b"Nonexistant";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = None;
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn empty_delimiter() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b"";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = Some(&request_bytes[..0]);
+
+            assert_eq!(result, expected_result);
+        }
+    }
 }
