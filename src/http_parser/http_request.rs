@@ -125,6 +125,43 @@ impl HttpRequest<'_> {
         Processing::Finished(Ok(partial_request.request))
     }
 
+    /// Returns the subdomain of the request, as determined by the `Host` header.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// # use webserver::http_parser::HttpRequest;
+    /// # use webserver::http_parser::HttpHeader;
+    /// let mut header = HttpHeader::new();
+    /// header.insert("Host", "uk.shop.example.com");
+    /// let request = HttpRequest {
+    /// #     method: None,
+    /// #     target: None,
+    /// #     version: None,
+    ///      header: Some(header),
+    /// #     body: None,
+    /// };
+    /// let domain_names = vec!("example.com");
+    /// let subdomain = request.subdomain(domain_names);
+    /// assert_eq!(subdomain, Some("uk.shop"));
+    /// ```
+    /// 
+    /// ```
+    /// # use webserver::http_parser::HttpRequest;
+    /// # use webserver::http_parser::HttpHeader;
+    /// # let mut header = HttpHeader::new();
+    /// header.insert("Host", "example.com");
+    /// # let request = HttpRequest {
+    /// #     method: None,
+    /// #     target: None,
+    /// #     version: None,
+    /// #     header: Some(header),
+    /// #     body: None,
+    /// # };
+    /// # let domain_names = vec!("example.com");
+    /// let subdomain = request.subdomain(domain_names);
+    /// assert_eq!(subdomain, None);
+    /// ```
     pub fn subdomain(&self, domain_names: Vec<&str>) -> Option<&str> {
         if let None = self.header {
             return None
@@ -139,15 +176,14 @@ impl HttpRequest<'_> {
             match host.find(domain_name) {
                 None => continue,
                 Some(index) => {
-                    return if index > 0 {
+                    if index == 0 {
+                        return None
+                    }
                         let subdomain = &host[..index];
                         if subdomain.ends_with(subdomain_delimiter) {
-                            Some(&subdomain[..(subdomain.len() - subdomain_delimiter.len_utf8())])
-                        } else {
-                            Some(subdomain)
-                        }
+                        return Some(&subdomain[..(subdomain.len() - subdomain_delimiter.len_utf8())])
                     } else {
-                        None
+                        return Some(subdomain)
                     }
                 },
             }
