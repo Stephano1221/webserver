@@ -25,11 +25,15 @@ impl HttpTarget {
         //     Err(_) => None,
         //     Ok(path) => Some(path),
         // };
-        let path = match target.split_once(parameter_delimiter) {
-            None => target.to_owned(),
+        let url_decoded_target = match urlencoding::decode(target) {
+            Err(_) => return None,
+            Ok(cow) => cow.into_owned(),
+        };
+        let path = match url_decoded_target.split_once(parameter_delimiter) {
+            None => url_decoded_target.to_owned(),
             Some((path, _)) => path.to_owned(),
         };
-        let parameters = HttpTargetParameters::from_str(target);
+        let parameters = HttpTargetParameters::from_str(url_decoded_target.as_ref());
 
         Some(HttpTarget {
             path: Some(path),
