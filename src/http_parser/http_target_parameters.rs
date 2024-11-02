@@ -1,6 +1,6 @@
 use std::collections::{hash_map, HashMap};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HttpTargetParameters(HashMap<String, Vec<String>>);
 
 impl HttpTargetParameters {

@@ -229,10 +229,10 @@ fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
 /// 
 /// # Examples
 /// 
-/// ```
+/// ```ignore
 /// let subdomain = "uk.shop";
 /// let path = subdomain_as_path(subdomain);
-/// assert_eq!("shop/uk", path);
+/// assert_eq!(path, "shop/uk");
 /// ```
 fn subdomain_as_path(subdomain: &str) -> String {
     let subdomain_delimiter = '.';

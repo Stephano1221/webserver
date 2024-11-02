@@ -1,6 +1,6 @@
 use super::HttpTargetParameters;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct HttpTarget {
     pub path: Option<String>,
     pub parameters: Option<HttpTargetParameters>,

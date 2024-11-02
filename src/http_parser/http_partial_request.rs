@@ -1,6 +1,6 @@
 use super::{HttpRequest, HttpVersion};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PartialHttpRequest<'a> {
     pub request: HttpRequest<'a>,
     pub next_byte: usize,

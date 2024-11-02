@@ -1,6 +1,6 @@
 use core::fmt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HttpMethod {
     Get,
     Head,
