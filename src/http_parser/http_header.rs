@@ -22,6 +22,9 @@ impl HttpHeader {
                 Some(index) => index,
             };
             let field_name = &unprocessed_bytes[..field_name_separator_index];
+            if bytes::find(field_name, line_delimiter).is_some() {
+                return None
+            }
             let new_start_index = if field_name_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_name_separator_index + field_name_delimiter.len() };
             unprocessed_bytes = &unprocessed_bytes[new_start_index..];
 
