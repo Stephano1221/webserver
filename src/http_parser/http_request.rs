@@ -551,4 +551,101 @@ mod tests {
             }
         }
     }
+    mod subdomain {
+        use super::super::*;
+
+        #[test]
+        fn with_subdomain() {
+            let domain_names = vec!("example.com");
+            let mut header = HttpHeader::new();
+            header.insert("Host", "uk.shop.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = Some("uk.shop");
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn without_subdomain() {
+            let domain_names = vec!("example.com");
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn with_no_host_header() {
+            let domain_names = vec!("example.com");
+            let header = HttpHeader::new();
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn with_empty_host() {
+            let domain_names = vec!("example.com");
+            let mut header = HttpHeader::new();
+            header.insert("Host", "");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn with_no_domain_names() {
+            let domain_names = vec!();
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    }
 }
