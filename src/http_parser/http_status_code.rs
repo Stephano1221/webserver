@@ -1,7 +1,7 @@
 use core::fmt;
 use std::io;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HttpStatusCode {
     Continue100,
     SwitchingProtocols101,

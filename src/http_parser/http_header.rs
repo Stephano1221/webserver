@@ -3,7 +3,7 @@ use std::collections::{hash_map, HashMap};
 
 use crate::helper::bytes;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HttpHeader(pub HashMap<String, String>);
 
 impl HttpHeader {
