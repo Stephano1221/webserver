@@ -1,19 +1,6 @@
-use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::{SocketAddr, TcpStream}};
+use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::TcpStream};
 
-use crate::{http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion}, network};
-
-pub struct Config {
-    pub domain_names: Vec<String>,
-    pub top_directory: String,
-    pub root_directory: String,
-    pub subdomain_directory: String,
-    pub socket: SocketAddr,
-    pub request_initial_buffer_size_kilobytes: usize,
-    pub request_maximum_buffer_size_kilobytes: usize,
-    pub request_default_filename: String,
-    pub not_found_filename: String,
-    pub request_timeout_seconds: usize,
-}
+use crate::{config::Config, http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion}, network};
 
 /// Starts the server with the specified configuration
 pub fn start_server(config: &Config) {
@@ -100,7 +87,7 @@ fn http_get(config: &Config, http_request: &mut HttpRequest) -> Result<HttpRespo
 
 fn http_head(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
     add_target_prefix(config, http_request);
-    set_filename_if_none(http_request, &config.request_default_filename);
+    set_filename_if_none(http_request, &config.global.request_default_filename);
     let http_version = http_request.version.as_ref().expect("`http_request.version` should be `Some`");
 
     let path = http_request.target.as_ref().expect("`http_request.target` should be `Some`").path.as_ref().expect("`http_request.target.path` should be `Some`");
@@ -192,7 +179,7 @@ fn get_not_found_path(config: &Config, http_request: &HttpRequest) -> String {
     if !path.ends_with(directory_delimiter) {
         path.push(directory_delimiter);
     }
-    path.push_str(&config.not_found_filename);
+    path.push_str(&config.global.not_found_filename);
     path
 }
 
@@ -217,9 +204,9 @@ fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
 /// Get the directory prefix for the specified root or subdomain(s) that can be prefixed to the target
 /// to get the full target path.
 fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
-    match http_request.subdomain(config.domain_names.iter().map(|s| s.as_ref()).collect()) {
-        None => format!("{}/{}", config.top_directory, config.root_directory),
-        Some(subdomain) => format!("{}/{}/{}", config.top_directory, config.subdomain_directory, subdomain_as_path(subdomain)),
+    match http_request.subdomain(config.global.domain_names.iter().map(|s| s.as_ref()).collect()) {
+        None => format!("{}/{}", config.global.top_directory, config.global.root_directory),
+        Some(subdomain) => format!("{}/{}/{}", config.global.top_directory, config.global.subdomain_directory, subdomain_as_path(subdomain)),
     }
 }
 
