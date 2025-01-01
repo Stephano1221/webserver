@@ -30,9 +30,7 @@ impl Config {
 
     /// Creates a new [`Config`] instance from a string containing <a href="https://toml.io">TOML</a>.
     pub fn from_str(str: &str) -> Result<Config, Box<dyn std::error::Error>> {
-        match toml::from_str(str) {
-            Ok(config) => Ok(config),
-            Err(e) => Err(Box::new(e)),
-        }
+        let config = toml::from_str(str)?;
+        Ok(config)
     }
 }

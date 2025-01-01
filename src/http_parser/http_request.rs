@@ -132,6 +132,15 @@ impl HttpRequest<'_> {
 
     /// Returns the subdomain of the request, as determined by the `Host` header.
     /// 
+    /// The first domain name in `domain_names` that is found in the `Host` header is used,
+    /// so domain names should be sorted by descending order of length (specificity) to
+    /// ensure that if there are two domains names, one with and one without a subdomain,
+    /// the one with the subdomain will be matched against (thus not returning the matching subdomain).
+    /// 
+    /// Sorting of `domain_names` isn't done here for performance reasons.
+    /// 
+    /// Note that this may change in the future.
+    /// 
     /// # Examples
     /// 
     /// ```
@@ -152,6 +161,29 @@ impl HttpRequest<'_> {
     /// ```
     /// 
     /// ```
+    /// 
+    /// # use webserver::http_parser::HttpRequest;
+    /// # use webserver::http_parser::HttpHeader;
+    /// let mut header = HttpHeader::new();
+    /// header.insert("Host", "uk.shop.example.com");
+    /// # let request = HttpRequest {
+    /// #     method: None,
+    /// #     target: None,
+    /// #     version: None,
+    /// #     header: Some(header),
+    /// #     body: None,
+    /// };
+    /// // The order of the domain names is important!
+    /// let domain_names = vec!("example.com", "shop.example.com");
+    /// let subdomain = request.subdomain(domain_names);
+    /// assert_eq!(subdomain, Some("uk.shop"));
+    /// let domain_names = vec!("shop.example.com", "example.com");
+    /// let subdomain = request.subdomain(domain_names);
+    /// assert_eq!(subdomain, Some("uk"));
+    /// ```
+    /// 
+    /// ```
+    /// 
     /// # use webserver::http_parser::HttpRequest;
     /// # use webserver::http_parser::HttpHeader;
     /// # let mut header = HttpHeader::new();
@@ -163,7 +195,7 @@ impl HttpRequest<'_> {
     /// #     header: Some(header),
     /// #     body: None,
     /// # };
-    /// # let domain_names = vec!("example.com");
+    /// let domain_names = vec!("example.com");
     /// let subdomain = request.subdomain(domain_names);
     /// assert_eq!(subdomain, None);
     /// ```
