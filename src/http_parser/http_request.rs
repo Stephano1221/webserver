@@ -209,7 +209,7 @@ impl HttpRequest<'_> {
         };
         let subdomain_delimiter = '.';
         for domain_name in domain_names {
-            match host.find(domain_name) {
+            match host.rfind(domain_name) {
                 None => continue,
                 Some(index) => {
                     let subdomain = &host[..index];
@@ -615,6 +615,25 @@ mod tests {
     
             let result = request.subdomain(domain_names);
             let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn subdomain_double_match() {
+            let domain_names = vec!("example.com");
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = Some("example.com");
     
             assert_eq!(result, expected_result);
         }
