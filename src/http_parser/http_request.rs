@@ -137,9 +137,8 @@ impl HttpRequest<'_> {
     /// ensure that if there are two domains names, one with and one without a subdomain,
     /// the one with the subdomain will be matched against (thus not returning the matching subdomain).
     /// 
-    /// Sorting of `domain_names` isn't done here for performance reasons.
-    /// 
-    /// Note that this may change in the future.
+    /// Sorting of `domain_names` isn't done here for performance reasons. Note that this
+    /// may change in the future.
     /// 
     /// # Examples
     /// 
@@ -213,15 +212,11 @@ impl HttpRequest<'_> {
             match host.find(domain_name) {
                 None => continue,
                 Some(index) => {
-                    if index == 0 {
-                        return None
-                    }
                     let subdomain = &host[..index];
                     if subdomain.ends_with(subdomain_delimiter) {
                         return Some(&subdomain[..(subdomain.len() - subdomain_delimiter.len_utf8())])
-                    } else {
-                        return Some(subdomain)
                     }
+                    return None
                 },
             }
         }
@@ -604,9 +599,47 @@ mod tests {
     
             assert_eq!(result, expected_result);
         }
+
+        #[test]
+        fn subdomain_partial_match() {
+            let domain_names = vec!("ample.com");
+            let mut header = HttpHeader::new();
+            header.insert("Host", "uk.shop.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn subdomain_dot() {
+            let domain_names = vec!("example.com");
+            let mut header = HttpHeader::new();
+            header.insert("Host", ".");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
     
         #[test]
-        fn without_subdomain() {
+        fn exact_match() {
             let domain_names = vec!("example.com");
             let mut header = HttpHeader::new();
             header.insert("Host", "example.com");
@@ -623,9 +656,26 @@ mod tests {
     
             assert_eq!(result, expected_result);
         }
+
+        #[test]
+        fn host_header_is_none() {
+            let domain_names = vec!("");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: None,
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
     
         #[test]
-        fn with_no_host_header() {
+        fn newly_created_host_header() {
             let domain_names = vec!("example.com");
             let header = HttpHeader::new();
             let request = HttpRequest {
@@ -641,9 +691,28 @@ mod tests {
     
             assert_eq!(result, expected_result);
         }
+
+        #[test]
+        fn empty_subdomain() {
+            let domain_names = vec!("");
+            let mut header = HttpHeader::new();
+            header.insert("Host", "");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
     
         #[test]
-        fn with_empty_host() {
+        fn empty_host() {
             let domain_names = vec!("example.com");
             let mut header = HttpHeader::new();
             header.insert("Host", "");
@@ -662,7 +731,7 @@ mod tests {
         }
     
         #[test]
-        fn with_no_domain_names() {
+        fn no_domain_names() {
             let domain_names = vec!();
             let mut header = HttpHeader::new();
             header.insert("Host", "example.com");
