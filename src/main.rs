@@ -5,11 +5,7 @@ use webserver::{config::Config, server};
 fn main() {
     let config_path = get_config_path();
     let config = match Config::from_file(&config_path) {
-        Ok(mut config) => {
-            // Domain names must be in descending order of length so that, later, subdomains are matched against first
-            config.global.domain_names.sort_by(|a, b| a.len().cmp(&b.len()).reverse());
-            config
-        },
+        Ok(config) => config,
         Err(e) => {
             let absolute_path = match path::absolute(&config_path) {
                 Ok(path) => path.to_string_lossy().to_string(),

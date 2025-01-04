@@ -132,14 +132,6 @@ impl HttpRequest<'_> {
 
     /// Returns the subdomain of the request, as determined by the `Host` header.
     /// 
-    /// The first domain name in `domain_names` that is found in the `Host` header is used,
-    /// so domain names should be sorted by descending order of length (specificity) to
-    /// ensure that if there are two domains names, one with and one without a subdomain,
-    /// the one with the subdomain will be matched against (thus not returning the matching subdomain).
-    /// 
-    /// Sorting of `domain_names` isn't done here for performance reasons. Note that this
-    /// may change in the future.
-    /// 
     /// # Examples
     /// 
     /// ```
@@ -163,28 +155,6 @@ impl HttpRequest<'_> {
     /// 
     /// # use webserver::http_parser::HttpRequest;
     /// # use webserver::http_parser::HttpHeader;
-    /// let mut header = HttpHeader::new();
-    /// header.insert("Host", "uk.shop.example.com");
-    /// # let request = HttpRequest {
-    /// #     method: None,
-    /// #     target: None,
-    /// #     version: None,
-    /// #     header: Some(header),
-    /// #     body: None,
-    /// };
-    /// // The order of the domain names is important!
-    /// let domain_names = vec!("example.com", "shop.example.com");
-    /// let subdomain = request.subdomain(domain_names);
-    /// assert_eq!(subdomain, Some("uk.shop"));
-    /// let domain_names = vec!("shop.example.com", "example.com");
-    /// let subdomain = request.subdomain(domain_names);
-    /// assert_eq!(subdomain, Some("uk"));
-    /// ```
-    /// 
-    /// ```
-    /// 
-    /// # use webserver::http_parser::HttpRequest;
-    /// # use webserver::http_parser::HttpHeader;
     /// # let mut header = HttpHeader::new();
     /// header.insert("Host", "example.com");
     /// # let request = HttpRequest {
@@ -202,13 +172,20 @@ impl HttpRequest<'_> {
         if let None = self.header {
             return None
         }
+
         let header = self.header.as_ref().expect("`self.header` should be `Some`");
         let host = match header.get_value(HttpFieldName::Host.to_string().as_str()) {
             None => return None,
             Some(host) => host,
         };
         let subdomain_delimiter = '.';
-        for domain_name in domain_names {
+
+        // Domain names must be in descending order of length so that where there are two identical domains,
+        // one with a subdomain and one without, the subdomain is matched first.
+        let mut sorted_domain_names = domain_names;
+        sorted_domain_names.sort_by_key(|a: &&str| std::cmp::Reverse(a.len()));
+
+        for domain_name in sorted_domain_names {
             match host.rfind(domain_name) {
                 None => continue,
                 Some(index) => {
@@ -220,6 +197,7 @@ impl HttpRequest<'_> {
                 },
             }
         }
+
         None
     }
 
@@ -634,6 +612,26 @@ mod tests {
     
             let result = request.subdomain(domain_names);
             let expected_result = Some("example.com");
+    
+            assert_eq!(result, expected_result);
+        }
+
+        
+        #[test]
+        fn subdomain_two_domains() {
+            let domain_names = vec!("example.com", "www.example.com");
+            let mut header = HttpHeader::new();
+            header.insert("Host", "www.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
     
             assert_eq!(result, expected_result);
         }
