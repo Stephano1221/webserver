@@ -208,8 +208,8 @@ fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
 /// to get the full target path.
 fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
     match http_request.subdomain(config.global.domain_names.as_ref().map(|s| s.iter().map(|s| s.as_str()).collect())) {
-        None => format!("{}/{}", config.global.top_directory, config.global.root_directory),
-        Some(subdomain) => format!("{}/{}/{}", config.global.top_directory, config.global.subdomain_directory, subdomain_as_path(subdomain)),
+        None => format!("{}/{}", config.global.parent_directory, config.global.primary_domain_folder_name),
+        Some(subdomain) => format!("{}/{}/{}", config.global.parent_directory, config.global.subdomains_folder_name, subdomain_as_path(subdomain)),
     }
 }
 

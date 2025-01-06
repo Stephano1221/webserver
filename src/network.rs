@@ -29,8 +29,8 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
 
     let mut buf_reader = BufReader::new(&mut stream);
     const BYTES_IN_KILOBYTE: usize = 1024;
-    let buffer_size_bytes = BYTES_IN_KILOBYTE * config.global.request_initial_buffer_size_kilobytes;
-    let buffer_maximum_size_bytes = BYTES_IN_KILOBYTE * config.global.request_maximum_buffer_size_kilobytes;
+    let buffer_size_bytes = BYTES_IN_KILOBYTE * config.global.initial_buffer_size_kilobytes;
+    let buffer_maximum_size_bytes = BYTES_IN_KILOBYTE * config.global.maximum_buffer_size_kilobytes;
     let mut buf = vec!(0; buffer_size_bytes);
     let mut buf_received_bytes = 0;
     let mut http_request = PartialHttpRequest::new();

@@ -1,9 +1,8 @@
 use std::{fs, path::Path};
 
-use serde_derive::Deserialize;
 use toml::{Table, Value};
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     pub global: Global,
 }
@@ -33,27 +32,27 @@ impl Config {
 
         let global_domain_names = Self::get_option_vec_string("domain_names", &global, &global_default.domain_names);
         let global_port = Self::get_u16("port", &global, &global_default.port);
-        let global_top_directory = Self::get_string("top_directory", &global, &global_default.top_directory);
-        let global_root_directory = Self::get_string("root_directory", &global, &global_default.root_directory);
-        let global_subdomain_directory = Self::get_string("subdomain_directory", &global, &global_default.subdomain_directory);
-        let global_request_initial_buffer_size_kilobytes = Self::get_usize("request_initial_buffer_size_kilobytes", &global, &global_default.request_initial_buffer_size_kilobytes);
-        let global_request_maximum_buffer_size_kilobytes = Self::get_usize("request_maximum_buffer_size_kilobytes", &global, &global_default.request_maximum_buffer_size_kilobytes);
+        let global_parent_directory = Self::get_string("parent_directory", &global, &global_default.parent_directory);
+        let global_primary_domain_folder_name = Self::get_string("primary_domain_folder_name", &global, &global_default.primary_domain_folder_name);
+        let global_subdomains_folder_name = Self::get_string("subdomains_folder_name", &global, &global_default.subdomains_folder_name);
         let global_default_filename = Self::get_string("default_filename", &global, &global_default.default_filename);
         let global_not_found_filename = Self::get_string("not_found_filename", &global, &global_default.not_found_filename);
-        let global_minimum_timeout_seconds = Self::get_option_usize("request_timeout_seconds", &global, &global_default.minimum_timeout_seconds);;
+        let global_minimum_timeout_seconds = Self::get_option_usize("minimum_timeout_seconds", &global, &global_default.minimum_timeout_seconds);;
+        let global_initial_buffer_size_kilobytes = Self::get_usize("initial_buffer_size_kilobytes", &global, &global_default.initial_buffer_size_kilobytes);
+        let global_maximum_buffer_size_kilobytes = Self::get_usize("maximum_buffer_size_kilobytes", &global, &global_default.maximum_buffer_size_kilobytes);
 
         Ok(Self {
             global: Global {
                 domain_names: global_domain_names,
                 port: global_port,
-                top_directory: global_top_directory,
-                root_directory: global_root_directory,
-                subdomain_directory: global_subdomain_directory,
-                request_initial_buffer_size_kilobytes: global_request_initial_buffer_size_kilobytes,
-                request_maximum_buffer_size_kilobytes: global_request_maximum_buffer_size_kilobytes,
+                parent_directory: global_parent_directory,
+                primary_domain_folder_name: global_primary_domain_folder_name,
+                subdomains_folder_name: global_subdomains_folder_name,
                 default_filename: global_default_filename,
                 not_found_filename: global_not_found_filename,
                 minimum_timeout_seconds: global_minimum_timeout_seconds,
+                initial_buffer_size_kilobytes: global_initial_buffer_size_kilobytes,
+                maximum_buffer_size_kilobytes: global_maximum_buffer_size_kilobytes,
             }
         })
     }
@@ -114,18 +113,18 @@ impl Default for Config {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Global {
     pub domain_names: Option<Vec<String>>,
     pub port: u16,
-    pub top_directory: String,
-    pub root_directory: String,
-    pub subdomain_directory: String,
-    pub request_initial_buffer_size_kilobytes: usize,
-    pub request_maximum_buffer_size_kilobytes: usize,
+    pub parent_directory: String,
+    pub primary_domain_folder_name: String,
+    pub subdomains_folder_name: String,
     pub default_filename: String,
     pub not_found_filename: String,
     pub minimum_timeout_seconds: Option<usize>,
+    pub initial_buffer_size_kilobytes: usize,
+    pub maximum_buffer_size_kilobytes: usize,
 }
 
 impl Global {
@@ -139,14 +138,14 @@ impl Default for Global {
         Global {
             domain_names: None,
             port: 80,
-            top_directory: String::from("content"),
-            root_directory: String::from("root"),
-            subdomain_directory: String::from("subdomains"),
-            request_initial_buffer_size_kilobytes: 16,
-            request_maximum_buffer_size_kilobytes: 1024,
+            parent_directory: String::from("content"),
+            primary_domain_folder_name: String::from("root"),
+            subdomains_folder_name: String::from("subdomains"),
             default_filename: String::from("index.html"),
             not_found_filename: String::from("404.html"),
             minimum_timeout_seconds: Some(5),
+            initial_buffer_size_kilobytes: 16,
+            maximum_buffer_size_kilobytes: 1024,
         }
     }
 }
@@ -177,14 +176,14 @@ mod tests {
                 global: Global {
                     domain_names: Some(vec![String::from("example.com"), String::from("www.example.com")]),
                     port: 80,
-                    top_directory: String::from("content"),
-                    root_directory: String::from("root"),
-                    subdomain_directory: String::from("subdomains"),
-                    request_initial_buffer_size_kilobytes: 16,
-                    request_maximum_buffer_size_kilobytes: 1024,
+                    parent_directory: String::from("content"),
+                    primary_domain_folder_name: String::from("root"),
+                    subdomains_folder_name: String::from("subdomains"),
                     default_filename: String::from("index.html"),
                     not_found_filename: String::from("404.html"),
                     minimum_timeout_seconds: Some(5),
+                    initial_buffer_size_kilobytes: 16,
+                    maximum_buffer_size_kilobytes: 1024,
                 }
             };
 
