@@ -11,11 +11,11 @@ pub fn start_server(config: &Config) {
 pub fn handle_request(config: &Config, stream: &mut TcpStream, http_request: &mut Result<HttpRequest, (io::Error, HttpStatusCode)>) {
     let http_response = get_response(config, http_request);
     match &http_response {
-        None => return,
+        None => (),
         Some(response) => {
             match send_response(stream, &response) {
-                Err(_error) => todo!(),
-                Ok(()) => return,
+                Err(error) => eprintln!("Error sending response: {}", error),
+                Ok(_) => (),
             }
         },
     }
@@ -24,7 +24,10 @@ pub fn handle_request(config: &Config, stream: &mut TcpStream, http_request: &mu
 /// Gets a response to a HTTP request
 pub fn get_response<'a>(config: &Config, http_request: &'a mut Result<HttpRequest, (io::Error, HttpStatusCode)>) -> Option<HttpResponse> {
     match http_request {
-        Err((error, status_code)) => { Some(HttpResponse::new(&HttpVersion::Http1Dot1, &status_code, &None, &None)) }
+        Err((error, status_code)) => {
+            eprintln!("Error getting response: {}", error);
+            Some(HttpResponse::new(&HttpVersion::Http1Dot1, &status_code, &None, &None))
+        }
         Ok(request) => {
             println!("{:#?}", request);
             let method = request.method.as_ref().expect("`request.method` should be `Some`");
@@ -87,7 +90,7 @@ fn http_get(config: &Config, http_request: &mut HttpRequest) -> Result<HttpRespo
 
 fn http_head(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
     add_target_prefix(config, http_request);
-    set_filename_if_none(http_request, &config.global.request_default_filename);
+    set_filename_if_none(http_request, &config.global.default_filename);
     let http_version = http_request.version.as_ref().expect("`http_request.version` should be `Some`");
 
     let path = http_request.target.as_ref().expect("`http_request.target` should be `Some`").path.as_ref().expect("`http_request.target.path` should be `Some`");
@@ -204,7 +207,7 @@ fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
 /// Get the directory prefix for the specified root or subdomain(s) that can be prefixed to the target
 /// to get the full target path.
 fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
-    match http_request.subdomain(config.global.domain_names.iter().map(|s| s.as_ref()).collect()) {
+    match http_request.subdomain(config.global.domain_names.as_ref().map(|s| s.iter().map(|s| s.as_str()).collect())) {
         None => format!("{}/{}", config.global.top_directory, config.global.root_directory),
         Some(subdomain) => format!("{}/{}/{}", config.global.top_directory, config.global.subdomain_directory, subdomain_as_path(subdomain)),
     }

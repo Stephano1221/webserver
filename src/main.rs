@@ -4,7 +4,7 @@ use webserver::{config::Config, server};
 
 fn main() {
     let config_path = get_config_path();
-    let config = match Config::from_file(&config_path) {
+    let config = match Config::from_toml_file(&config_path) {
         Ok(config) => config,
         Err(e) => {
             let absolute_path = match path::absolute(&config_path) {

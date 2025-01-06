@@ -36,10 +36,12 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
     let mut http_request = PartialHttpRequest::new();
 
     let mut http_request = loop {
-        if (config.global.request_timeout_seconds > 0) && (now.elapsed().as_secs() > config.global.request_timeout_seconds as u64) {
-            server::handle_request(config, &mut stream, &mut Err((io::ErrorKind::Other.into(), HttpStatusCode::RequestTimeout408)));
-            println!("Request from {} timed out after {}ms", stream_ip_address, now.elapsed().as_millis());
-            return;
+        if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
+            if timeout_seconds > 0 && now.elapsed().as_secs() >= timeout_seconds as u64 {
+                server::handle_request(config, &mut stream, &mut Err((io::ErrorKind::Other.into(), HttpStatusCode::RequestTimeout408)));
+                println!("Request from {} timed out after {}ms", stream_ip_address, now.elapsed().as_millis());
+                return;
+            }
         }
         let bytes_read = buf_reader.read(&mut buf);
         if let Err(error) = bytes_read {

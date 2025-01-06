@@ -4,7 +4,7 @@ use crate::helper::{bytes, enums::Processing};
 
 use super::{HttpFieldName, HttpHeader, HttpMethod, HttpStatusCode, HttpTarget, HttpVersion, PartialHttpRequest};
 
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct HttpRequest<'a> {
     pub method: Option<HttpMethod>,
     pub target: Option<HttpTarget>,
@@ -146,7 +146,7 @@ impl HttpRequest<'_> {
     ///      header: Some(header),
     /// #     body: None,
     /// };
-    /// let domain_names = vec!("example.com");
+    /// let domain_names = Some(vec!("example.com"));
     /// let subdomain = request.subdomain(domain_names);
     /// assert_eq!(subdomain, Some("uk.shop"));
     /// ```
@@ -164,14 +164,15 @@ impl HttpRequest<'_> {
     /// #     header: Some(header),
     /// #     body: None,
     /// # };
-    /// let domain_names = vec!("example.com");
+    /// let domain_names = Some(vec!("example.com"));
     /// let subdomain = request.subdomain(domain_names);
     /// assert_eq!(subdomain, None);
     /// ```
-    pub fn subdomain(&self, domain_names: Vec<&str>) -> Option<&str> {
-        if let None = self.header {
+    pub fn subdomain(&self, domain_names: Option<Vec<&str>>) -> Option<&str> {
+        if self.header.is_none() || domain_names.is_none() {
             return None
         }
+        let domain_names = domain_names.unwrap();
 
         let header = self.header.as_ref().expect("`self.header` should be `Some`");
         let host = match header.get_value(HttpFieldName::Host.to_string().as_str()) {
@@ -561,7 +562,7 @@ mod tests {
 
         #[test]
         fn with_subdomain() {
-            let domain_names = vec!("example.com");
+            let domain_names = Some(vec!("example.com"));
             let mut header = HttpHeader::new();
             header.insert("Host", "uk.shop.example.com");
             let request = HttpRequest {
@@ -579,8 +580,8 @@ mod tests {
         }
 
         #[test]
-        fn subdomain_partial_match() {
-            let domain_names = vec!("ample.com");
+        fn partial_match() {
+            let domain_names = Some(vec!("ample.com"));
             let mut header = HttpHeader::new();
             header.insert("Host", "uk.shop.example.com");
             let request = HttpRequest {
@@ -598,8 +599,8 @@ mod tests {
         }
 
         #[test]
-        fn subdomain_double_match() {
-            let domain_names = vec!("example.com");
+        fn double_match() {
+            let domain_names = Some(vec!("example.com"));
             let mut header = HttpHeader::new();
             header.insert("Host", "example.com.example.com");
             let request = HttpRequest {
@@ -618,8 +619,8 @@ mod tests {
 
         
         #[test]
-        fn subdomain_two_domains() {
-            let domain_names = vec!("example.com", "www.example.com");
+        fn two_domains() {
+            let domain_names = Some(vec!("example.com", "www.example.com"));
             let mut header = HttpHeader::new();
             header.insert("Host", "www.example.com");
             let request = HttpRequest {
@@ -637,8 +638,8 @@ mod tests {
         }
 
         #[test]
-        fn subdomain_dot() {
-            let domain_names = vec!("example.com");
+        fn dot() {
+            let domain_names = Some(vec!("example.com"));
             let mut header = HttpHeader::new();
             header.insert("Host", ".");
             let request = HttpRequest {
@@ -657,7 +658,7 @@ mod tests {
     
         #[test]
         fn exact_match() {
-            let domain_names = vec!("example.com");
+            let domain_names = Some(vec!("example.com"));
             let mut header = HttpHeader::new();
             header.insert("Host", "example.com");
             let request = HttpRequest {
@@ -676,7 +677,7 @@ mod tests {
 
         #[test]
         fn host_header_is_none() {
-            let domain_names = vec!("");
+            let domain_names = Some(vec!(""));
             let request = HttpRequest {
                 method: None,
                 target: None,
@@ -693,7 +694,7 @@ mod tests {
     
         #[test]
         fn newly_created_host_header() {
-            let domain_names = vec!("example.com");
+            let domain_names = Some(vec!("example.com"));
             let header = HttpHeader::new();
             let request = HttpRequest {
                 method: None,
@@ -711,7 +712,7 @@ mod tests {
 
         #[test]
         fn empty_subdomain() {
-            let domain_names = vec!("");
+            let domain_names = Some(vec!(""));
             let mut header = HttpHeader::new();
             header.insert("Host", "");
             let request = HttpRequest {
@@ -730,7 +731,7 @@ mod tests {
     
         #[test]
         fn empty_host() {
-            let domain_names = vec!("example.com");
+            let domain_names = Some(vec!("example.com"));
             let mut header = HttpHeader::new();
             header.insert("Host", "");
             let request = HttpRequest {
@@ -749,7 +750,26 @@ mod tests {
     
         #[test]
         fn no_domain_names() {
-            let domain_names = vec!();
+            let domain_names = Some(vec!());
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn domain_names_are_none() {
+            let domain_names = None;
             let mut header = HttpHeader::new();
             header.insert("Host", "example.com");
             let request = HttpRequest {
