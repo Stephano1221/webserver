@@ -1,19 +1,6 @@
-use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::{SocketAddr, TcpStream}};
+use std::{error::Error, fs::OpenOptions, io::{self, Read}, net::TcpStream};
 
-use crate::{http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion}, network};
-
-pub struct Config {
-    pub domain_names: Vec<String>,
-    pub top_directory: String,
-    pub root_directory: String,
-    pub subdomain_directory: String,
-    pub socket: SocketAddr,
-    pub request_initial_buffer_size_kilobytes: usize,
-    pub request_maximum_buffer_size_kilobytes: usize,
-    pub request_default_filename: String,
-    pub not_found_filename: String,
-    pub request_timeout_seconds: usize,
-}
+use crate::{config::Config, http_parser::{HttpFieldName, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpStatusCode, HttpTarget, HttpVersion}, network};
 
 /// Starts the server with the specified configuration
 pub fn start_server(config: &Config) {
@@ -24,11 +11,11 @@ pub fn start_server(config: &Config) {
 pub fn handle_request(config: &Config, stream: &mut TcpStream, http_request: &mut Result<HttpRequest, (io::Error, HttpStatusCode)>) {
     let http_response = get_response(config, http_request);
     match &http_response {
-        None => return,
+        None => (),
         Some(response) => {
             match send_response(stream, &response) {
-                Err(_error) => todo!(),
-                Ok(()) => return,
+                Err(error) => eprintln!("Error sending response: {}", error),
+                Ok(_) => (),
             }
         },
     }
@@ -37,7 +24,10 @@ pub fn handle_request(config: &Config, stream: &mut TcpStream, http_request: &mu
 /// Gets a response to a HTTP request
 pub fn get_response<'a>(config: &Config, http_request: &'a mut Result<HttpRequest, (io::Error, HttpStatusCode)>) -> Option<HttpResponse> {
     match http_request {
-        Err((error, status_code)) => { Some(HttpResponse::new(&HttpVersion::Http1Dot1, &status_code, &None, &None)) }
+        Err((error, status_code)) => {
+            eprintln!("Error getting response: {}", error);
+            Some(HttpResponse::new(&HttpVersion::Http1Dot1, &status_code, &None, &None))
+        }
         Ok(request) => {
             println!("{:#?}", request);
             let method = request.method.as_ref().expect("`request.method` should be `Some`");
@@ -100,7 +90,7 @@ fn http_get(config: &Config, http_request: &mut HttpRequest) -> Result<HttpRespo
 
 fn http_head(config: &Config, http_request: &mut HttpRequest) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
     add_target_prefix(config, http_request);
-    set_filename_if_none(http_request, &config.request_default_filename);
+    set_filename_if_none(http_request, &config.global.default_filename);
     let http_version = http_request.version.as_ref().expect("`http_request.version` should be `Some`");
 
     let path = http_request.target.as_ref().expect("`http_request.target` should be `Some`").path.as_ref().expect("`http_request.target.path` should be `Some`");
@@ -192,7 +182,7 @@ fn get_not_found_path(config: &Config, http_request: &HttpRequest) -> String {
     if !path.ends_with(directory_delimiter) {
         path.push(directory_delimiter);
     }
-    path.push_str(&config.not_found_filename);
+    path.push_str(&config.global.not_found_filename);
     path
 }
 
@@ -217,9 +207,9 @@ fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
 /// Get the directory prefix for the specified root or subdomain(s) that can be prefixed to the target
 /// to get the full target path.
 fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
-    match http_request.subdomain(config.domain_names.iter().map(|s| s.as_ref()).collect()) {
-        None => format!("{}/{}", config.top_directory, config.root_directory),
-        Some(subdomain) => format!("{}/{}/{}", config.top_directory, config.subdomain_directory, subdomain_as_path(subdomain)),
+    match http_request.subdomain(config.global.domain_names.as_ref().map(|s| s.iter().map(|s| s.as_str()).collect())) {
+        None => format!("{}/{}", config.global.parent_directory, config.global.primary_domain_folder_name),
+        Some(subdomain) => format!("{}/{}/{}", config.global.parent_directory, config.global.subdomains_folder_name, subdomain_as_path(subdomain)),
     }
 }
 

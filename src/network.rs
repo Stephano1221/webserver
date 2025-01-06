@@ -1,13 +1,15 @@
 use std::{
-    error::Error, io::{self, BufReader, Read, Write}, net::{IpAddr, TcpListener, TcpStream}, time::Instant
+    error::Error, io::{self, BufReader, Read, Write}, net::{IpAddr, SocketAddr, TcpListener, TcpStream}, time::Instant
 };
 
-use crate::{helper::enums::Processing, http_parser::{HttpRequest, HttpStatusCode, PartialHttpRequest}, server};
+use crate::{config::Config, helper::enums::Processing, http_parser::{HttpRequest, HttpStatusCode, PartialHttpRequest}, server};
 
-pub fn start_listener(config: &server::Config) {
-    let tcp_listener = TcpListener::bind(config.socket).expect("Should be able to bind to local IP address");
+pub fn start_listener(config: &Config) {
+    let local_ipv4_address = get_local_ipv4_address();
+    let socket = SocketAddr::new(local_ipv4_address, config.global.port);
+    let tcp_listener = TcpListener::bind(socket).expect("Should be able to bind to local IP address");
     println!("Server started.");
-    println!("Local IPv4 Address: {}", config.socket.ip());
+    println!("Local IPv4 Address: {}", socket.ip());
     for stream in tcp_listener.incoming() {
         let stream = stream.expect("`stream` should always be `Some()`");
         accept_connection(config, stream);
@@ -20,24 +22,26 @@ pub fn get_local_ipv4_address() -> IpAddr {
     return local_ipv4_address;
 }
 
-fn accept_connection(config: &server::Config, mut stream: TcpStream) {
+fn accept_connection(config: &Config, mut stream: TcpStream) {
     let now = Instant::now();
     let stream_ip_address = stream.peer_addr().expect("`Stream` should contain the socket address of the remote peer");
     println!("Connection request from: {stream_ip_address}.");
 
     let mut buf_reader = BufReader::new(&mut stream);
     const BYTES_IN_KILOBYTE: usize = 1024;
-    let buffer_size_bytes = BYTES_IN_KILOBYTE * config.request_initial_buffer_size_kilobytes;
-    let buffer_maximum_size_bytes = BYTES_IN_KILOBYTE * config.request_maximum_buffer_size_kilobytes;
+    let buffer_size_bytes = BYTES_IN_KILOBYTE * config.global.initial_buffer_size_kilobytes;
+    let buffer_maximum_size_bytes = BYTES_IN_KILOBYTE * config.global.maximum_buffer_size_kilobytes;
     let mut buf = vec!(0; buffer_size_bytes);
     let mut buf_received_bytes = 0;
     let mut http_request = PartialHttpRequest::new();
 
     let mut http_request = loop {
-        if (config.request_timeout_seconds > 0) && (now.elapsed().as_secs() > 5) {
-            server::handle_request(config, &mut stream, &mut Err((io::ErrorKind::Other.into(), HttpStatusCode::RequestTimeout408)));
-            println!("Request from {} timed out after {}ms", stream_ip_address, now.elapsed().as_millis());
-            return;
+        if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
+            if timeout_seconds > 0 && now.elapsed().as_secs() >= timeout_seconds as u64 {
+                server::handle_request(config, &mut stream, &mut Err((io::ErrorKind::Other.into(), HttpStatusCode::RequestTimeout408)));
+                println!("Request from {} timed out after {}ms", stream_ip_address, now.elapsed().as_millis());
+                return;
+            }
         }
         let bytes_read = buf_reader.read(&mut buf);
         if let Err(error) = bytes_read {
