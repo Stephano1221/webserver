@@ -30,7 +30,7 @@ impl Config {
         let global_default = Global::default();
         let global = Self::get_option_table("global", &table, &None);
 
-        let global_domain_names = Self::get_option_vec_string("domain_names", &global, &global_default.domain_names);
+        let global_primary_domain_names = Self::get_option_vec_string("primary_domain_names", &global, &global_default.primary_domain_names);
         let global_port = Self::get_u16("port", &global, &global_default.port);
         let global_parent_directory = Self::get_string("parent_directory", &global, &global_default.parent_directory);
         let global_primary_domain_folder_name = Self::get_string("primary_domain_folder_name", &global, &global_default.primary_domain_folder_name);
@@ -43,7 +43,7 @@ impl Config {
 
         Ok(Self {
             global: Global {
-                domain_names: global_domain_names,
+                primary_domain_names: global_primary_domain_names,
                 port: global_port,
                 parent_directory: global_parent_directory,
                 primary_domain_folder_name: global_primary_domain_folder_name,
@@ -115,7 +115,7 @@ impl Default for Config {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Global {
-    pub domain_names: Option<Vec<String>>,
+    pub primary_domain_names: Option<Vec<String>>,
     pub port: u16,
     pub parent_directory: String,
     pub primary_domain_folder_name: String,
@@ -136,10 +136,10 @@ impl Global {
 impl Default for Global {
     fn default() -> Self {
         Global {
-            domain_names: None,
+            primary_domain_names: None,
             port: 80,
             parent_directory: String::from("content"),
-            primary_domain_folder_name: String::from("root"),
+            primary_domain_folder_name: String::from("primary_domain"),
             subdomains_folder_name: String::from("subdomains"),
             default_filename: String::from("index.html"),
             not_found_filename: String::from("404.html"),
@@ -174,7 +174,7 @@ mod tests {
             let result = Config::from_toml_str(toml).unwrap();
             let expected_result = Config {
                 global: Global {
-                    domain_names: Some(vec![String::from("example.com"), String::from("www.example.com")]),
+                    primary_domain_names: Some(vec![String::from("example.com"), String::from("www.example.com")]),
                     port: 80,
                     parent_directory: String::from("content"),
                     primary_domain_folder_name: String::from("root"),
