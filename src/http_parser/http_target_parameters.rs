@@ -1,10 +1,10 @@
 use std::collections::{hash_map, HashMap};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HttpTargetParameters(HashMap<String, Vec<String>>);
 
 impl HttpTargetParameters {
-    pub fn from_str(target: &str) -> Result<Self, ()> {
+    pub fn from_str(target: &str) -> Option<Self> {
         let mut parameters = HashMap::new();
         let query_delimiter = '?';
         let target = match target.find(query_delimiter) {
@@ -44,8 +44,8 @@ impl HttpTargetParameters {
             }
         }
         match parameters.len() {
-            0 => Err(()),
-            _ => Ok(Self(parameters)),
+            0 => None,
+            _ =>Some(Self(parameters)),
         }
     }
 

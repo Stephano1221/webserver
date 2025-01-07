@@ -4,7 +4,7 @@ use crate::helper::{bytes, enums::Processing};
 
 use super::{HttpFieldName, HttpHeader, HttpMethod, HttpStatusCode, HttpTarget, HttpVersion, PartialHttpRequest};
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct HttpRequest<'a> {
     pub method: Option<HttpMethod>,
     pub target: Option<HttpTarget>,
@@ -16,7 +16,7 @@ pub struct HttpRequest<'a> {
 impl HttpRequest<'_> {
     /// NOTE: Some of this is wrong until the function is improved to use references properly.
     /// 
-    /// Tries to parse an array of bytes into a [`HttpRequest`].
+    /// Tries to parse an array of bytes into a [`HttpRequest`]. No parsing will be done on the body.
     /// 
     /// If all of the bytes for the request have been received, then it should return a
     /// [`Processing<Finished<Result<HttpRequest>>>`].
@@ -26,30 +26,32 @@ impl HttpRequest<'_> {
     /// supplied `partial_request` can be passed back into this function to continue
     /// processing once more `request_bytes` are received.
     /// 
-    /// The supplied `partial_request` will be modified in this method, and the returned
+    /// TODO: The supplied `partial_request` will be modified in this method, and the returned
     /// references will either be `partial_request`'s [`PartialHttpRequest`] if there are
     /// more bytes to process, or the [`HttpRequest`] inside it if processing is finished.
     /// 
     /// # Bad Data
     /// If the request doesn't contain a full, understood request header (method, target
     /// and HTTP version), this function will return a [`Processing<Finished<Result<(Error, HttpStatusCode)>>>`]
-    /// with a recommended [`HttpStatusCode`]. If field names are unknown, the field will be ignored.
+    /// with a recommended [`HttpStatusCode`].
+    /// 
+    /// If field names are unknown, the field will be ignored.
     /// If field names or field values contain non-UTF8 characters, the entire field line will be ignored.
-    /// No parsing will be done on the body.
     pub fn try_parse<'a>(partial_request: &PartialHttpRequest<'a>, request_bytes: &'a [u8]) -> Processing<PartialHttpRequest<'a>, Result<HttpRequest<'a>, (io::Error, HttpStatusCode)>> {
         let mut partial_request = partial_request.clone();
         let word_delimiter = b" ";
         let line_delimiter = b"\r\n";
         let body_delimiter = b"\r\n\r\n";
-        let bad_request = Processing::Finished(Err((io::ErrorKind::InvalidInput.into(), HttpStatusCode::NotImplemented501)));
+        let bad_request = Processing::Finished(Err((io::ErrorKind::InvalidInput.into(), HttpStatusCode::BadRequest400)));
         let not_implemented = Processing::Finished(Err((io::ErrorKind::InvalidInput.into(), HttpStatusCode::NotImplemented501)));
+        let version_not_supported = Processing::Finished(Err((io::ErrorKind::InvalidInput.into(), HttpStatusCode::HttpVersionNotSupported505)));
 
         // Method
         if partial_request.request.method.is_none() {
             partial_request.request.method = match Self::find_until(&mut partial_request, request_bytes, word_delimiter) {
                 None => return Processing::InProgress(partial_request),
                 Some(before_delimiter) => match std::str::from_utf8(before_delimiter) {
-                    Err(_) => return not_implemented,
+                    Err(_) => return bad_request,
                     Ok(slice) => match HttpMethod::from_str(slice) {
                         None => return not_implemented,
                         Some(method) => Some(method),
@@ -63,10 +65,10 @@ impl HttpRequest<'_> {
             partial_request.request.target = match Self::find_until(&mut partial_request, request_bytes, word_delimiter) {
                 None => return Processing::InProgress(partial_request),
                 Some(before_delimiter) => match std::str::from_utf8(before_delimiter) {
-                    Err(_) => return not_implemented,
+                    Err(_) => return bad_request,
                     Ok(slice) => match HttpTarget::from_str(slice) {
-                        Err(_) => return not_implemented,
-                        Ok(target) => Some(target),
+                        None => return bad_request,
+                        Some(target) => Some(target),
                     },
                 },
             }
@@ -77,9 +79,9 @@ impl HttpRequest<'_> {
             partial_request.request.version = match Self::find_until(&mut partial_request, request_bytes, line_delimiter) {
                 None => return Processing::InProgress(partial_request),
                 Some(before_delimiter) => match std::str::from_utf8(before_delimiter) {
-                    Err(_) => return not_implemented,
+                    Err(_) => return bad_request,
                     Ok(slice) => match HttpVersion::from_str(slice) {
-                        None => return not_implemented,
+                        None => return version_not_supported,
                         Some(method) => Some(method),
                     },
                 },
@@ -91,7 +93,7 @@ impl HttpRequest<'_> {
             partial_request.request.header = match Self::find_until(&mut partial_request, request_bytes, body_delimiter) {
                 None => return Processing::InProgress(partial_request),
                 Some(before_delimiter) => match HttpHeader::from_bytes(before_delimiter) {
-                    None => None,
+                    None => return bad_request,
                     Some(header) => Some(header),
                 },
             }
@@ -104,11 +106,19 @@ impl HttpRequest<'_> {
                 Some(header) => {
                     match header.0.entry(HttpFieldName::ContentLength.to_string()) {
                         hash_map::Entry::Vacant(_) => None,
-                        hash_map::Entry::Occupied(length) => {
-                            match length.get().parse() {
+                        hash_map::Entry::Occupied(entry) => {
+                            match entry.get().parse::<usize>() {
                                 Err(_) => return bad_request,
-                                Ok(end_index) => {
-                                    Some(&request_bytes[partial_request.next_byte..end_index])
+                                Ok(content_length) => {
+                                    if content_length == 0 {
+                                        None
+                                    } else {
+                                        let end_index = partial_request.next_byte + content_length;
+                                        if request_bytes.len() < end_index {
+                                            return Processing::InProgress(partial_request)
+                                        }
+                                        Some(&request_bytes[partial_request.next_byte..end_index])
+                                    }
                                 },
                             }
                         },
@@ -120,33 +130,75 @@ impl HttpRequest<'_> {
         Processing::Finished(Ok(partial_request.request))
     }
 
-    pub fn subdomain(&self, domain_names: Vec<&str>) -> Option<&str> {
-        if let None = self.header {
+    /// Returns the subdomain of the request, as determined by the `Host` header.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// # use webserver::http_parser::HttpRequest;
+    /// # use webserver::http_parser::HttpHeader;
+    /// let mut header = HttpHeader::new();
+    /// header.insert("Host", "uk.shop.example.com");
+    /// let request = HttpRequest {
+    /// #     method: None,
+    /// #     target: None,
+    /// #     version: None,
+    ///      header: Some(header),
+    /// #     body: None,
+    /// };
+    /// let domain_names = Some(vec!("example.com"));
+    /// let subdomain = request.subdomain(domain_names);
+    /// assert_eq!(subdomain, Some("uk.shop"));
+    /// ```
+    /// 
+    /// ```
+    /// 
+    /// # use webserver::http_parser::HttpRequest;
+    /// # use webserver::http_parser::HttpHeader;
+    /// # let mut header = HttpHeader::new();
+    /// header.insert("Host", "example.com");
+    /// # let request = HttpRequest {
+    /// #     method: None,
+    /// #     target: None,
+    /// #     version: None,
+    /// #     header: Some(header),
+    /// #     body: None,
+    /// # };
+    /// let domain_names = Some(vec!("example.com"));
+    /// let subdomain = request.subdomain(domain_names);
+    /// assert_eq!(subdomain, None);
+    /// ```
+    pub fn subdomain(&self, domain_names: Option<Vec<&str>>) -> Option<&str> {
+        if self.header.is_none() || domain_names.is_none() {
             return None
         }
+        let domain_names = domain_names.unwrap();
+
         let header = self.header.as_ref().expect("`self.header` should be `Some`");
         let host = match header.get_value(HttpFieldName::Host.to_string().as_str()) {
             None => return None,
             Some(host) => host,
         };
         let subdomain_delimiter = '.';
-        for domain_name in domain_names {
-            match host.find(domain_name) {
+
+        // Domain names must be in descending order of length so that where there are two identical domains,
+        // one with a subdomain and one without, the subdomain is matched first.
+        let mut sorted_domain_names = domain_names;
+        sorted_domain_names.sort_by_key(|a: &&str| std::cmp::Reverse(a.len()));
+
+        for domain_name in sorted_domain_names {
+            match host.rfind(domain_name) {
                 None => continue,
                 Some(index) => {
-                    return if index > 0 {
-                        let subdomain = &host[..index];
-                        if subdomain.ends_with(subdomain_delimiter) {
-                            Some(&subdomain[..(subdomain.len() - subdomain_delimiter.len_utf8())])
-                        } else {
-                            Some(subdomain)
-                        }
-                    } else {
-                        None
+                    let subdomain = &host[..index];
+                    if subdomain.ends_with(subdomain_delimiter) {
+                        return Some(&subdomain[..(subdomain.len() - subdomain_delimiter.len_utf8())])
                     }
+                    return None
                 },
             }
         }
+
         None
     }
 
@@ -189,6 +241,614 @@ impl HttpRequest<'_> {
                 partial_request.next_byte = end_index + delimiter.len();
                 Some(&request_bytes[start_index..end_index])
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    mod try_parse {
+        use super::super::*;
+
+        #[test]
+        fn full_request() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2 HTTP/1.1\r\nHost: example.com\r\nContent-Length:3\r\n\r\nabc";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_request = HttpRequest {
+                method: Some(HttpMethod::Get),
+                target: HttpTarget::from_str("/path1/path2"),
+                version: Some(HttpVersion::Http1Dot1),
+                header: HttpHeader::from_bytes(b"Host: example.com\r\nContent-Length: 3\r\n\r\n"),
+                body: Some(b"abc"),
+            };
+
+            if let Processing::Finished(Ok(request)) = result {
+                assert_eq!(request, expected_request);
+            } else {
+                panic!("Expected Processing::Finished(Ok(HttpRequest)), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_up_until_method() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET ";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_request = HttpRequest {
+                method: Some(HttpMethod::Get),
+                target: None,
+                version: None,
+                header: None,
+                body: None,
+            };
+            let expected_partial_request = PartialHttpRequest {
+                request: expected_request,
+                next_byte: 4,
+            };
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request, expected_partial_request);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_up_until_target() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2 ";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_request = HttpRequest {
+                method: Some(HttpMethod::Get),
+                target: HttpTarget::from_str("/path1/path2"),
+                version: None,
+                header: None,
+                body: None,
+            };
+            let expected_partial_request = PartialHttpRequest {
+                request: expected_request,
+                next_byte: 17,
+            };
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request, expected_partial_request);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_up_until_http_version() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2 HTTP/1.1\r\n";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_request = HttpRequest {
+                method: Some(HttpMethod::Get),
+                target: HttpTarget::from_str("/path1/path2"),
+                version: Some(HttpVersion::Http1Dot1),
+                header: None,
+                body: None,
+            };
+            let expected_partial_request = PartialHttpRequest {
+                request: expected_request,
+                next_byte: 27,
+            };
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request, expected_partial_request);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+        
+        #[test]
+        fn partial_up_until_headers() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2 HTTP/1.1\r\nHost: example.com\r\nContent-Length: 3\r\n\r\n";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_request = HttpRequest {
+                method: Some(HttpMethod::Get),
+                target: HttpTarget::from_str("/path1/path2"),
+                version: Some(HttpVersion::Http1Dot1),
+                header: HttpHeader::from_bytes(b"Host: example.com\r\nContent-Length: 3\r\n\r\n"),
+                body: None,
+            };
+            let expected_partial_request = PartialHttpRequest {
+                request: expected_request,
+                next_byte: 67,
+            };
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request, expected_partial_request);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_method() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_method = None;
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request.request.method, expected_method);
+                assert_eq!(partial_request.next_byte, 0);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_path() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_target = None;
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request.request.target, expected_target);
+                assert_eq!(partial_request.next_byte, 4);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_http_version() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2 HTTP/1.1";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_version= None;
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request.request.version, expected_version);
+                assert_eq!(partial_request.next_byte, 17);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_headers() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2 HTTP/1.1\r\nHost: example.com\r\nContent-Length: 3\r\n\r";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_headers = None;
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request.request.header, expected_headers);
+                assert_eq!(partial_request.next_byte, 27);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn partial_body() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET /path1/path2 HTTP/1.1\r\nHost: example.com\r\nContent-Length: 3\r\n\r\nab";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_body = None;
+    
+            if let Processing::InProgress(partial_request) = result {
+                assert_eq!(partial_request.request.body, expected_body);
+                assert_eq!(partial_request.next_byte, 67);
+            } else {
+                panic!("Expected Processing::InProgress(PartialHttpRequest), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn invalid_method() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"HELLO ";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+
+            let expected_error = io::ErrorKind::InvalidInput;
+            let expected_status_code = HttpStatusCode::NotImplemented501;
+    
+            if let Processing::Finished(Err(err )) = result {
+                let error = err.0.kind();
+                let status_code = err.1;
+                assert_eq!(error, expected_error);
+                assert_eq!(status_code, expected_status_code);
+            } else {
+                panic!("Expected Processing::Finished(Err(Error, HttpStatusCode)), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn invalid_target() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET  ";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+            let expected_error = io::ErrorKind::InvalidInput;
+            let expected_status_code = HttpStatusCode::BadRequest400;
+    
+            if let Processing::Finished(Err(err )) = result {
+                let error = err.0.kind();
+                let status_code = err.1;
+                assert_eq!(error, expected_error);
+                assert_eq!(status_code, expected_status_code);
+            } else {
+                panic!("Expected Processing::Finished(Err(Error, HttpStatusCode)), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn invalid_version() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / ABC/1.1\r\n";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+            let expected_error = io::ErrorKind::InvalidInput;
+            let expected_status_code = HttpStatusCode::HttpVersionNotSupported505;
+    
+            if let Processing::Finished(Err(err )) = result {
+                let error = err.0.kind();
+                let status_code = err.1;
+                assert_eq!(error, expected_error);
+                assert_eq!(status_code, expected_status_code);
+            } else {
+                panic!("Expected Processing::Finished(Err(Error, HttpStatusCode)), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn invalid_header() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\nHost: example.com\r\ninvalid\r\nContent-Length: 0\r\n\r\n";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+            let expected_error = io::ErrorKind::InvalidInput;
+            let expected_status_code = HttpStatusCode::BadRequest400;
+    
+            if let Processing::Finished(Err(err )) = result {
+                let error = err.0.kind();
+                let status_code = err.1;
+                assert_eq!(error, expected_error);
+                assert_eq!(status_code, expected_status_code);
+            } else {
+                panic!("Expected Processing::Finished(Err(Error, HttpStatusCode)), but got {:?}", result);
+            }
+        }
+
+        #[test]
+        fn missing_header() {
+            let partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n\r\n\r\n";
+
+            let result = HttpRequest::try_parse(&partial_request, request_bytes);
+            let expected_error = io::ErrorKind::InvalidInput;
+            let expected_status_code = HttpStatusCode::BadRequest400;
+    
+            if let Processing::Finished(Err(err )) = result {
+                let error = err.0.kind();
+                let status_code = err.1;
+                assert_eq!(error, expected_error);
+                assert_eq!(status_code, expected_status_code);
+            } else {
+                panic!("Expected Processing::Finished(Err(Error, HttpStatusCode)), but got {:?}", result);
+            }
+        }
+    }
+    mod subdomain {
+        use super::super::*;
+
+        #[test]
+        fn with_subdomain() {
+            let domain_names = Some(vec!("example.com"));
+            let mut header = HttpHeader::new();
+            header.insert("Host", "uk.shop.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = Some("uk.shop");
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn partial_match() {
+            let domain_names = Some(vec!("ample.com"));
+            let mut header = HttpHeader::new();
+            header.insert("Host", "uk.shop.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn double_match() {
+            let domain_names = Some(vec!("example.com"));
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = Some("example.com");
+    
+            assert_eq!(result, expected_result);
+        }
+
+        
+        #[test]
+        fn two_domains() {
+            let domain_names = Some(vec!("example.com", "www.example.com"));
+            let mut header = HttpHeader::new();
+            header.insert("Host", "www.example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn dot() {
+            let domain_names = Some(vec!("example.com"));
+            let mut header = HttpHeader::new();
+            header.insert("Host", ".");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn exact_match() {
+            let domain_names = Some(vec!("example.com"));
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn host_header_is_none() {
+            let domain_names = Some(vec!(""));
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: None,
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn newly_created_host_header() {
+            let domain_names = Some(vec!("example.com"));
+            let header = HttpHeader::new();
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn empty_subdomain() {
+            let domain_names = Some(vec!(""));
+            let mut header = HttpHeader::new();
+            header.insert("Host", "");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn empty_host() {
+            let domain_names = Some(vec!("example.com"));
+            let mut header = HttpHeader::new();
+            header.insert("Host", "");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    
+        #[test]
+        fn no_domain_names() {
+            let domain_names = Some(vec!());
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn domain_names_are_none() {
+            let domain_names = None;
+            let mut header = HttpHeader::new();
+            header.insert("Host", "example.com");
+            let request = HttpRequest {
+                method: None,
+                target: None,
+                version: None,
+                header: Some(header),
+                body: None,
+            };
+    
+            let result = request.subdomain(domain_names);
+            let expected_result = None;
+    
+            assert_eq!(result, expected_result);
+        }
+    }
+    mod find_until {
+        use super::super::*;
+
+        #[test]
+        fn first_space() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b" ";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = Some(&request_bytes[..3]);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn second_space() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b" ";
+
+            HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = Some(&request_bytes[4..=4]);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn not_found() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b"Nonexistant";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = None;
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn empty_request_bytes() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"";
+            let delimiter = b"Nonexistant";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = None;
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn empty_delimiter() {
+            let mut partial_request = PartialHttpRequest::new();
+            let request_bytes = b"GET / HTTP/1.1\r\n";
+            let delimiter = b"";
+
+            let result = HttpRequest::find_until(&mut partial_request, request_bytes, delimiter);
+            let expected_result = Some(&request_bytes[..0]);
+
+            assert_eq!(result, expected_result);
         }
     }
 }

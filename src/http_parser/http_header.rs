@@ -3,7 +3,7 @@ use std::collections::{hash_map, HashMap};
 
 use crate::helper::bytes;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HttpHeader(pub HashMap<String, String>);
 
 impl HttpHeader {
@@ -22,6 +22,9 @@ impl HttpHeader {
                 Some(index) => index,
             };
             let field_name = &unprocessed_bytes[..field_name_separator_index];
+            if bytes::find(field_name, line_delimiter).is_some() {
+                return None
+            }
             let new_start_index = if field_name_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_name_separator_index + field_name_delimiter.len() };
             unprocessed_bytes = &unprocessed_bytes[new_start_index..];
 
@@ -75,8 +78,9 @@ impl fmt::Display for HttpHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut output = String::new();
         for (key, value) in &self.0 {
-            output.push_str(&format!("{key}: {value}"));
+            output.push_str(&format!("{key}: {value}\n"));
         }
+        let _ = output.split_off(output.len() - 1);
         write!(f, "{output}")
     }
 }

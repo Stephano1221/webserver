@@ -1,6 +1,6 @@
 use super::HttpTargetParameters;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct HttpTarget {
     pub path: Option<String>,
     pub parameters: Option<HttpTargetParameters>,
@@ -15,28 +15,30 @@ impl HttpTarget {
         }
     }
 
-    pub fn from_str(target: &str) -> Result<Self, ()> {
+    pub fn from_str(target: &str) -> Option<Self> {
+        if target.is_empty() {
+            return None
+        }
+        
         let parameter_delimiter = '?';
         // let filepath = match Filepath::from_str(target) {
         //     Err(_) => None,
         //     Ok(path) => Some(path),
         // };
-        let path = match target.split_once(parameter_delimiter) {
-            None => Some(target.to_owned()),
-            Some((path, _)) => Some(path.to_owned()),
+        let url_decoded_target = match urlencoding::decode(target) {
+            Err(_) => return None,
+            Ok(cow) => cow.into_owned(),
         };
-        let parameters = match HttpTargetParameters::from_str(target) {
-            Err(_) => None,
-            Ok(parameters) => Some(parameters),
+        let path = match url_decoded_target.split_once(parameter_delimiter) {
+            None => url_decoded_target.to_owned(),
+            Some((path, _)) => path.to_owned(),
         };
-        if !path.is_none() || !parameters.is_none() {
-            Ok(HttpTarget {
-                path,
-                parameters,
-            })
-        } else {
-            Err(())
-        }
+        let parameters = HttpTargetParameters::from_str(url_decoded_target.as_ref());
+
+        Some(HttpTarget {
+            path: Some(path),
+            parameters,
+        })
     }
 
     pub fn directory(&self) -> Option<&str> {
