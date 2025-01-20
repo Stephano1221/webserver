@@ -80,3 +80,179 @@ impl fmt::Display for HttpHeader {
         write!(f, "{output}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    mod from_bytes {
+        use super::super::*;
+
+        #[test]
+        fn no_headers() {
+            let bytes = b"";
+
+            let expected_result = None;
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn one_header() {
+            let bytes = b"Host: example.com";
+
+            let expected_result = Some(HttpHeader({
+                let mut fields = HashMap::new();
+                fields.insert("Host".to_owned(), "example.com".to_owned());
+                fields
+            }));
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn two_headers() {
+            let bytes = b"Host: example.com\r\nContent-Length:3";
+
+            let expected_result = Some(HttpHeader({
+                let mut fields = HashMap::new();
+                fields.insert("Host".to_owned(), "example.com".to_owned());
+                fields.insert("Content-Length".to_owned(), "3".to_owned());
+                fields
+            }));
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn header_value_with_leading_and_trailing_spaces() {
+            let bytes = b"Host:  example.com  ";
+
+            let expected_result = Some(HttpHeader({
+                let mut fields = HashMap::new();
+                fields.insert("Host".to_owned(), "example.com".to_owned());
+                fields
+            }));
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn header_with_field_name_with_space() {
+            let bytes = b"Ho st: \r\nexample.com";
+
+            let expected_result = None;
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn header_with_field_name_with_newlines() {
+            let bytes = b"H\ros\nt: \r\nexample.com";
+
+            let expected_result = None;
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn invalid_header_between_valid_headers() {
+            let bytes = b"Host: example.com\r\n Bad : a\r\nContent-Length:3";
+
+            let expected_result = None;
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn field_value_on_multiple_lines() {
+            let bytes = b"List: 1\r\nList: 2";
+
+            let expected_result = Some(HttpHeader({
+                let mut fields = HashMap::new();
+                fields.insert("List".to_owned(), "1, 2".to_owned());
+                fields
+            }));
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn only_field_name() {
+            let bytes = b"Host";
+
+            let expected_result = None;
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn field_name_and_seperator() {
+            let bytes = b"Host:";
+
+            let expected_result = Some(HttpHeader({
+                let mut fields = HashMap::new();
+                fields.insert("Host".to_owned(), "".to_owned());
+                fields
+            }));
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn field_name_and_seperator_with_space() {
+            let bytes = b"Host: ";
+
+            let expected_result = Some(HttpHeader({
+                let mut fields = HashMap::new();
+                fields.insert("Host".to_owned(), "".to_owned());
+                fields
+            }));
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn field_name_and_seperator_with_comma() {
+            let bytes = b"Host: , ";
+
+            let expected_result = Some(HttpHeader({
+                let mut fields = HashMap::new();
+                fields.insert("Host".to_owned(), ",".to_owned());
+                fields
+            }));
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn only_separator() {
+            let bytes = b":";
+
+            let expected_result = None;
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+
+        #[test]
+        fn only_separator_with_space() {
+            let bytes = b" : ";
+
+            let expected_result = None;
+            let result = HttpHeader::from_bytes(bytes);
+
+            assert_eq!(result, expected_result);
+        }
+    }
+}
