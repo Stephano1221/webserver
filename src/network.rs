@@ -1,5 +1,5 @@
 use std::{
-    error::Error, io::{self, BufReader, Read, Write}, net::{IpAddr, SocketAddr, TcpListener, TcpStream}, time::Instant
+    error::Error, io::{self, BufReader, Read, Write}, net::{IpAddr, SocketAddr, TcpListener, TcpStream}, thread::sleep, time::{Duration, Instant}
 };
 
 use crate::{config::Config, helper::enums::Processing, http_parser::{HttpRequest, HttpStatusCode, PartialHttpRequest}, server};
@@ -19,13 +19,18 @@ pub fn start_listener(config: &Config) {
 pub fn get_local_ipv4_address() -> IpAddr {
     let get_ipv4_stream = TcpStream::connect("ipv4.icanhazip.com:443").expect("Should be able to connect to icanhazip.com");
     let local_ipv4_address = get_ipv4_stream.local_addr().expect("Should be able to read local socket address").ip();
-    return local_ipv4_address;
+    local_ipv4_address
 }
 
 fn accept_connection(config: &Config, mut stream: TcpStream) {
     let now = Instant::now();
     let stream_ip_address = stream.peer_addr().expect("`Stream` should contain the socket address of the remote peer");
     println!("Connection request from: {stream_ip_address}.");
+
+    if let Err(error) = stream.set_nonblocking(true) {
+        eprintln!("Error setting nonblocking. Dropping connection to prevent blocking: {}", error);
+        return
+    }
 
     let mut buf_reader = BufReader::new(&mut stream);
     const BYTES_IN_KILOBYTE: usize = 1024;
@@ -40,14 +45,21 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
             if timeout_seconds > 0 && now.elapsed().as_secs() >= timeout_seconds as u64 {
                 server::handle_request(config, &mut stream, &mut Err((io::ErrorKind::Other.into(), HttpStatusCode::RequestTimeout408)));
                 println!("Request from {} timed out after {}ms", stream_ip_address, now.elapsed().as_millis());
-                return;
+                return
             }
         }
         let bytes_read = buf_reader.read(&mut buf);
         if let Err(error) = bytes_read {
             match error.kind() {
                 io::ErrorKind::Interrupted => continue,
-                _ => return,
+                io::ErrorKind::WouldBlock => {
+                    sleep(Duration::from_millis(1));
+                    continue
+                },
+                _ => {
+                    eprintln!("Error reading from stream: {}", error);
+                    return
+                },
             }
         }
         buf_received_bytes += bytes_read.expect("`bytes_read` should be `Ok` here");
