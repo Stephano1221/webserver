@@ -21,10 +21,16 @@ impl HttpHeader {
                 None => break,
                 Some(index) => index,
             };
+
             let field_name = &unprocessed_bytes[..field_name_separator_index];
-            if bytes::find(field_name, line_delimiter).is_some() {
+            let field_name = match std::str::from_utf8(field_name) {
+                Err(_) => return None,
+                Ok(field_name) => field_name,
+            };
+            if field_name.len() == 0 || field_name.contains(|c: char| c.is_whitespace()) {
                 return None
             }
+
             let new_start_index = if field_name_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_name_separator_index + field_name_delimiter.len() };
             unprocessed_bytes = &unprocessed_bytes[new_start_index..];
 
@@ -32,31 +38,21 @@ impl HttpHeader {
                 None => unprocessed_bytes.len(),
                 Some(index) => index,
             };
-            let field_value = &unprocessed_bytes[..field_value_separator_index];
-            let new_start_index = if field_value_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_value_separator_index + line_delimiter.len() };
-            unprocessed_bytes = &unprocessed_bytes[new_start_index..];
 
-            let field_name = match std::str::from_utf8(field_name) {
-                Err(_) => continue,
-                Ok(field_name) => field_name.trim(),
-            };
-            let field_value = match std::str::from_utf8(field_value) {
-                Err(_) => continue,
+            let field_value = &unprocessed_bytes[..field_value_separator_index];
+            let field_value = match std::str::from_utf8(&field_value) {
+                Err(_) => return None,
                 Ok(field_value) => field_value.trim(),
             };
 
+            let new_start_index = if field_value_separator_index >= unprocessed_bytes.len() { unprocessed_bytes.len() } else { field_value_separator_index + line_delimiter.len() };
+            unprocessed_bytes = &unprocessed_bytes[new_start_index..];
+
+            let field_value = field_value.replace(|c: char| ['\r', '\n'].contains(&c), " ");
+
             match fields.entry(field_name.to_owned()) {
                 hash_map::Entry::Vacant(entry) => { entry.insert(field_value.to_owned()); },
-                hash_map::Entry::Occupied(mut entry) => {
-                    // let old_value = entry.get();
-                    // let new_value = format!("{old_value}, {field_value}");
-                    // entry.insert(new_value);
-
-                    // let old_value = entry.get_mut();
-                    // *old_value = format!("{old_value}, {field_value}");
-
-                    *entry.get_mut() = format!("{}, {field_value}", entry.get());
-                },
+                hash_map::Entry::Occupied(mut entry) => { *entry.get_mut() = format!("{}, {field_value}", entry.get()); },
             };
         }
         match fields.len() {

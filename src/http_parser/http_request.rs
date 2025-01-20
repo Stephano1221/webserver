@@ -231,6 +231,9 @@ impl HttpRequest<'_> {
     //     }
     // }
 
+    /// Returns a byte array containing the bytes up until (but excluding) the first occurrence of the `delimiter`.
+    /// 
+    /// This also advances `partial_request`'s `next_byte` to the byte after the end of the delimiter.
     fn find_until<'a>(partial_request: &mut PartialHttpRequest, request_bytes: &'a [u8], delimiter: &[u8]) -> Option<&'a [u8]> {
         let start_index = partial_request.next_byte;
         let unprocessed_bytes = &request_bytes[start_index..];
