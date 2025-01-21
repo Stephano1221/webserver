@@ -44,7 +44,7 @@ default_filename = "index.html"
 # The default filename to retrieve if the requested file is not found.
 not_found_filename = "404.html"
 
-# The minimum amount of time that a request will be processed for.
+# The minimum amount of time that a request will be processed for before timing out.
 # The actual processing time may be higher.
 minimum_timeout_seconds = 5
 
@@ -52,8 +52,8 @@ minimum_timeout_seconds = 5
 initial_buffer_size_kilobytes = 16
 
 # The maximum buffer size, in kilobytes, that is allocated for each request.
-# If the request exceeds this size, it will be dropped without further processing
-# or sending of a response.
+# If the request exceeds this size, it will be dropped without further processing and a
+# 413 Content Too Large response will be returned.
 maximum_buffer_size_kilobytes = 1024
 ```
 
