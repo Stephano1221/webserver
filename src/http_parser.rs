@@ -1,3 +1,9 @@
+//! This parser attempts to comply with the following RFCs:
+//! - [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html)
+//! - [RFC 9112](https://www.rfc-editor.org/rfc/rfc9112.html)
+//!
+//! This may change as new RFCs are published or adapted.
+
 mod http_protocol;
 mod http_method;
 mod http_version;

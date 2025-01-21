@@ -159,16 +159,16 @@ mod tests {
         fn from_valid_str() {
             let toml = r#"
                 [global]
-                domain_names = ["example.com", "www.example.com"]
+                primary_domain_names = ["example.com", "www.example.com"]
                 port = 80
-                top_directory = "content"
-                root_directory = "root"
-                subdomain_directory = "subdomains"
-                request_initial_buffer_size_kilobytes = 16
-                request_maximum_buffer_size_kilobytes = 1024
+                parent_directory = "content"
+                primary_domain_folder_name = "root"
+                subdomains_folder_name = "subdomains"
                 default_filename = "index.html"
                 not_found_filename = "404.html"
-                request_timeout_seconds = 5
+                minimum_timeout_seconds = 5
+                initial_buffer_size_kilobytes = 16
+                maximum_buffer_size_kilobytes = 1024
                 "#;
             
             let result = Config::from_toml_str(toml).unwrap();

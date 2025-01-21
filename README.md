@@ -14,22 +14,28 @@ Ensure that a configuration file is in a supported location. If values aren't pr
 
 ### Example config.toml
 ```toml
-#Global configuration, which applies to all virtual hosts (currently, only global configuration is supported).
+# Global configuration, which applies to all virtual hosts (currently, only global configuration
+# is supported).
 [global]
 
 # The primary domain names, which are all treated as being identical to each other.
 primary_domain_names = ["example.com", "www.example.com"]
 
-# The port on which the server listens for incoming requests. Usually 80 for HTTP and 443 for HTTPS. Currently, HTTPS is unsupported.
+# The port on which the server listens for incoming requests. Usually 80 for HTTP and 443 for HTTPS.
+# Currently, HTTPS is unsupported.
 port = 80
 
-# A directory that contains one folder containing the primary domains' files, and one folder containing folders for each subdomain. This can be either relative or absolute.
+# A directory that contains one folder containing the primary domains' files, and one folder
+# containing folders for each subdomain. This can be either relative or absolute.
 parent_directory = "C:\ProgramData\Website"
 
-# The name of the folder inside of the parent directory that contains the files that are served for the primary domains. This is where index.html for the primary domains would go.
+# The name of the folder inside of the parent directory that contains the files that are served
+# for the primary domains. This is where index.html for the primary domains would go.
 primary_domain_folder_name = "primary_domain"
 
-# The name of the folder inside of the parent directory that contains the folders for each subdomain. Each folder in here should have a name of a subdomain, inside of which index.html for that subdomain would go.
+# The name of the folder inside of the parent directory that contains the folders for each subdomain.
+# Each folder in here should have a name of a subdomain, inside of which index.html for that
+# subdomain would go.
 subdomains_folder_name = "subdomains"
 
 # The default filename to retrieve if none is specified in the URL.
@@ -38,13 +44,16 @@ default_filename = "index.html"
 # The default filename to retrieve if the requested file is not found.
 not_found_filename = "404.html"
 
-# The minimum amount of time that a request will be processed for. The actual processing time may be higher.
+# The minimum amount of time that a request will be processed for before timing out.
+# The actual processing time may be higher.
 minimum_timeout_seconds = 5
 
 # The initial buffer size, in kilobytes, that is allocated for each request.
 initial_buffer_size_kilobytes = 16
 
-# The maximum buffer size, in kilobytes, that is allocated for each request. If the request exceeds this size, it will be dropped without further processing or sending of a response.
+# The maximum buffer size, in kilobytes, that is allocated for each request.
+# If the request exceeds this size, it will be dropped without further processing and a
+# 413 Content Too Large response will be returned.
 maximum_buffer_size_kilobytes = 1024
 ```
 
