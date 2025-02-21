@@ -1,4 +1,4 @@
-use std::collections::{hash_map, HashMap};
+use std::collections::{HashMap, hash_map};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HttpTargetParameters(HashMap<String, Vec<String>>);
@@ -20,7 +20,11 @@ impl HttpTargetParameters {
                 Some(index) => index,
             };
             let key = &unprocessed_text[..key_separator_index];
-            let new_start_index = if key_separator_index >= unprocessed_text.len() { unprocessed_text.len() } else { key_separator_index + 1 };
+            let new_start_index = if key_separator_index >= unprocessed_text.len() {
+                unprocessed_text.len()
+            } else {
+                key_separator_index + 1
+            };
             unprocessed_text = &unprocessed_text[new_start_index..];
 
             let parameter_separator_index = match unprocessed_text.find(parameter_delimiter) {
@@ -28,7 +32,11 @@ impl HttpTargetParameters {
                 Some(index) => index,
             };
             let value = &unprocessed_text[..parameter_separator_index];
-            let new_start_index = if parameter_separator_index >= unprocessed_text.len() { unprocessed_text.len() } else { parameter_separator_index + 1 };
+            let new_start_index = if parameter_separator_index >= unprocessed_text.len() {
+                unprocessed_text.len()
+            } else {
+                parameter_separator_index + 1
+            };
             unprocessed_text = &unprocessed_text[new_start_index..];
 
             match parameters.entry(key.to_owned()) {
@@ -36,16 +44,16 @@ impl HttpTargetParameters {
                     let mut values = Vec::new();
                     values.push(value.to_owned());
                     entry.insert(values);
-                },
+                }
                 hash_map::Entry::Occupied(mut entry) => {
                     let values = entry.get_mut();
                     values.push(value.to_owned());
-                },
+                }
             }
         }
         match parameters.len() {
             0 => None,
-            _ =>Some(Self(parameters)),
+            _ => Some(Self(parameters)),
         }
     }
 

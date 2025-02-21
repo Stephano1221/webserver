@@ -14,7 +14,7 @@ impl HttpFieldName {
             "content-length" => Some(Self::ContentLength),
             "content-type" => Some(Self::ContentType),
             "host" => Some(Self::Host),
-            _ => None
+            _ => None,
         }
     }
 }

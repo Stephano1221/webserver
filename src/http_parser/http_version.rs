@@ -2,14 +2,14 @@ use core::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum HttpVersion {
-    Http1Dot1
+    Http1Dot1,
 }
 
 impl HttpVersion {
     pub fn from_str(version: &str) -> Option<Self> {
         match version.trim() {
             "HTTP/1.1" => Some(Self::Http1Dot1),
-            _ => None
+            _ => None,
         }
     }
 }

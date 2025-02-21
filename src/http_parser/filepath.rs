@@ -24,7 +24,7 @@ impl Filepath {
                     return Ok(Filepath {
                         directory: Some(slice.to_owned()),
                         filename: None,
-                    })
+                    });
                 }
                 match slice[(directory_index + 1)..].find(file_extension_delimiter) {
                     None => Ok(Filepath {
@@ -36,18 +36,18 @@ impl Filepath {
                         filename: Some(slice[(directory_index + 1)..].to_owned()),
                     }),
                 }
-            },
+            }
         }
     }
 }
 
 impl fmt::Display for Filepath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let directory = match &self.directory{
+        let directory = match &self.directory {
             None => "",
             Some(directory) => directory,
         };
-        let filename = match &self.filename{
+        let filename = match &self.filename {
             None => "",
             Some(filename) => filename,
         };
