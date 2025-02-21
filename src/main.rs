@@ -12,7 +12,7 @@ fn main() {
                 Err(_) => config_path.to_string_lossy().to_string(),
             };
             let default_message = format!("Unable to read configuration file: {e}. Please ensure that a valid configuration file is found at: {absolute_path}");
-            if let Some(err) = e.downcast_ref::<std::io::Error>() {
+            match e.downcast_ref::<std::io::Error>() { Some(err) => {
                 match err.kind() {
                     std::io::ErrorKind::NotFound => {
                         eprintln!("Configuration file not found. Please ensure that a valid configuration file is found at: {}", absolute_path);
@@ -22,11 +22,11 @@ fn main() {
                     },
                     _ => eprintln!("{}", default_message),
                 }
-            } else if let Some(err) = e.downcast_ref::<toml::de::Error>() {
+            } _ => { match e.downcast_ref::<toml::de::Error>() { Some(err) => {
                 eprintln!("An error occured while parsing the configuration file. Please ensure that the configuration file at {} is valid: {}", absolute_path, err);
-            } else {
+            } _ => {
                 eprintln!("{}", default_message);
-            }
+            }}}}
             return
         }
     };
