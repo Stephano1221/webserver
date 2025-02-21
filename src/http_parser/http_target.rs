@@ -17,9 +17,9 @@ impl HttpTarget {
 
     pub fn from_str(target: &str) -> Option<Self> {
         if target.is_empty() {
-            return None
+            return None;
         }
-        
+
         let parameter_delimiter = '?';
         // let filepath = match Filepath::from_str(target) {
         //     Err(_) => None,
@@ -50,7 +50,7 @@ impl HttpTarget {
     }
 
     /// Sets the `path`'s filename.
-    /// 
+    ///
     /// # Safety
     /// The new `path` will be `Some`.
     pub fn set_filename(&mut self, filename: &str) {
@@ -68,7 +68,7 @@ impl HttpTarget {
     }
 
     /// Sets the `path`'s directory.
-    /// 
+    ///
     /// # Safety
     /// The new `path` will be `Some`.
     pub fn set_directory(&mut self, directory: &str) {
@@ -86,16 +86,19 @@ impl HttpTarget {
 
     pub fn directory_count(&self) -> usize {
         if let None = self.path {
-            return 0
+            return 0;
         }
         let directory_delimiter = '/';
         let full_path = &self.path.as_ref().expect("`path` should be `Some`")[..];
-        full_path.chars().filter(|c| *c == directory_delimiter).count()
+        full_path
+            .chars()
+            .filter(|c| *c == directory_delimiter)
+            .count()
     }
 
     pub fn n_directories(&self, directories: usize) -> Option<&str> {
         if let None = self.path {
-            return None
+            return None;
         }
         let directory_delimiter = '/';
         let full_path = &self.path.as_ref().expect("`path` should be `Some`")[..];
@@ -109,18 +112,19 @@ impl HttpTarget {
                     found_directories += 1;
                     last_directory_separator_index += index;
                     if found_directories >= directories {
-                        return Some(&full_path[..=last_directory_separator_index])
+                        return Some(&full_path[..=last_directory_separator_index]);
                     }
-                    let new_start_index = if last_directory_separator_index >= unprocessed_path.len() {
-                        unprocessed_path.len()
-                    } else {
-                        last_directory_separator_index += 1;
-                        last_directory_separator_index
-                    };
+                    let new_start_index =
+                        if last_directory_separator_index >= unprocessed_path.len() {
+                            unprocessed_path.len()
+                        } else {
+                            last_directory_separator_index += 1;
+                            last_directory_separator_index
+                        };
                     unprocessed_path = &unprocessed_path[new_start_index..];
-                },
+                }
             }
-        };
+        }
         None
     }
 
@@ -129,16 +133,12 @@ impl HttpTarget {
         let filename_extension_delimiter = '.';
         match &self.path {
             None => (None, None),
-            Some(path) => {
-                match path.rfind(filename_extension_delimiter) {
-                    None => (Some(path), None),
-                    Some(_) => {
-                        match path.rfind(directory_delimiter) {
-                            None => (None, Some(path)),
-                            Some(index) => (Some(&path[..=index]), Some(&path[(index + 1)..])),
-                        }
-                    },
-                }
+            Some(path) => match path.rfind(filename_extension_delimiter) {
+                None => (Some(path), None),
+                Some(_) => match path.rfind(directory_delimiter) {
+                    None => (None, Some(path)),
+                    Some(index) => (Some(&path[..=index]), Some(&path[(index + 1)..])),
+                },
             },
         }
     }

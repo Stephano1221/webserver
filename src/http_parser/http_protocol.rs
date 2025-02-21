@@ -1,13 +1,13 @@
 pub enum HttpProtocol {
     Http,
-    Https
+    Https,
 }
 
 impl HttpProtocol {
     pub fn port(&self) -> u16 {
         match self {
             HttpProtocol::Http => 80,
-            HttpProtocol::Https => 443
+            HttpProtocol::Https => 443,
         }
     }
 }

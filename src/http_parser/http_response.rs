@@ -10,7 +10,12 @@ pub struct HttpResponse {
 }
 
 impl HttpResponse {
-    pub fn new(version: &HttpVersion, status_code: &HttpStatusCode, header: &Option<&HttpHeader>, body: &Option<&[u8]>) -> Self {
+    pub fn new(
+        version: &HttpVersion,
+        status_code: &HttpStatusCode,
+        header: &Option<&HttpHeader>,
+        body: &Option<&[u8]>,
+    ) -> Self {
         HttpResponse {
             version: version.clone(),
             status_code: status_code.clone(),
@@ -42,6 +47,10 @@ impl fmt::Display for HttpResponse {
             Some(header) => header.to_string(),
             None => String::new(),
         };
-        write!(f, "{} {}\r\n{}\r\n\r\n[Body]", self.version, self.status_code, header)
+        write!(
+            f,
+            "{} {}\r\n{}\r\n\r\n[Body]",
+            self.version, self.status_code, header
+        )
     }
 }
