@@ -30,7 +30,7 @@ pub fn handle_request(
     match &http_response {
         None => (),
         Some(response) => match send_response(stream, &response) {
-            Err(error) => eprintln!("Error sending response: {}", error),
+            Err(error) => eprintln!("Error sending response: {}.", error),
             Ok(_) => (),
         },
     }
@@ -43,7 +43,7 @@ pub fn get_response<'a>(
 ) -> Option<HttpResponse> {
     match http_request {
         Err((error, status_code)) => {
-            eprintln!("Error getting response: {}", error);
+            eprintln!("Error getting response: {}.", error);
             Some(HttpResponse::new(
                 &HttpVersion::Http1Dot1,
                 &status_code,

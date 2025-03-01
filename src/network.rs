@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     io::{self, BufReader, Read, Write},
-    net::{IpAddr, SocketAddr, TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -13,33 +13,31 @@ use crate::{
     server,
 };
 
+use local_ip_address::local_ip;
+
 pub fn start_listener(config: &Config) -> Result<(), Box<dyn Error>> {
-    let local_ipv4_address = get_local_ipv4_address();
+    let local_ipv4_address = match local_ip() {
+        Ok(ip_address) => ip_address,
+        Err(error) => {
+            eprintln!("Unable to determine local IPv4 address.");
+            return Err(Box::new(error));
+        }
+    };
     let socket_address = SocketAddr::new(local_ipv4_address, config.global.port);
     let tcp_listener = match TcpListener::bind(socket_address) {
         Ok(listener) => listener,
         Err(error) => {
-            eprintln!("Unable to bind to address {}", socket_address);
+            eprintln!("Unable to bind to address {}.", socket_address);
             return Err(Box::new(error));
         }
     };
     println!("Server started.");
-    println!("Local IPv4 Address: {}", socket_address.ip());
+    println!("Local IPv4 Address: {}.", socket_address.ip());
     for stream in tcp_listener.incoming() {
         let stream = stream.expect("`stream` should always be `Some()`");
         accept_connection(config, stream);
     }
     Ok(())
-}
-
-pub fn get_local_ipv4_address() -> IpAddr {
-    let get_ipv4_stream = TcpStream::connect("ipv4.icanhazip.com:443")
-        .expect("Should be able to connect to icanhazip.com");
-    let local_ipv4_address = get_ipv4_stream
-        .local_addr()
-        .expect("Should be able to read local socket address")
-        .ip();
-    local_ipv4_address
 }
 
 fn accept_connection(config: &Config, mut stream: TcpStream) {
@@ -51,7 +49,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
 
     if let Err(error) = stream.set_nonblocking(true) {
         eprintln!(
-            "Error setting nonblocking. Dropping connection to prevent blocking: {}",
+            "Unable to set nonblocking. Dropping connection to prevent blocking with error: {}.",
             error
         );
         return;
@@ -77,7 +75,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
                     )),
                 );
                 println!(
-                    "Request from {} timed out after {}ms",
+                    "Request from {} timed out after {}ms.",
                     stream_ip_address,
                     now.elapsed().as_millis()
                 );
@@ -93,7 +91,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
                     continue;
                 }
                 _ => {
-                    eprintln!("Error reading from stream: {}", error);
+                    eprintln!("Error reading from stream: {}.", error);
                     return;
                 }
             }
@@ -118,7 +116,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
 
     server::handle_request(config, &mut stream, &mut http_request);
     println!(
-        "Handled request from {} in {}ms",
+        "Handled request from {} in {}ms.",
         stream_ip_address,
         now.elapsed().as_millis()
     );

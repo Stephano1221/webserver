@@ -16,19 +16,19 @@ fn main() -> ExitCode {
                 Err(_) => config_path.to_string_lossy().to_string(),
             };
             let default_message = format!(
-                "Unable to read configuration file: {error}. Please ensure that a valid configuration file is found at: {absolute_path}"
+                "Unable to read configuration file: {error}. Please ensure that a valid configuration file is found at: {absolute_path}."
             );
             match error.downcast_ref::<std::io::Error>() {
                 Some(err) => match err.kind() {
                     std::io::ErrorKind::NotFound => {
                         eprintln!(
-                            "Configuration file not found. Please ensure that a valid configuration file is found at: {}",
+                            "Configuration file not found. Please ensure that a valid configuration file is found at: {}.",
                             absolute_path
                         );
                     }
                     std::io::ErrorKind::PermissionDenied => {
                         eprintln!(
-                            "Permission denied reading configuration file at: {}",
+                            "Permission denied reading configuration file at: {}.",
                             absolute_path
                         );
                     }
@@ -37,7 +37,7 @@ fn main() -> ExitCode {
                 None => match error.downcast_ref::<toml::de::Error>() {
                     Some(err) => {
                         eprintln!(
-                            "An error occured while parsing the configuration file. Please ensure that the configuration file at {} is valid: {}",
+                            "An error occured while parsing the configuration file. Please ensure that the configuration file at {} is valid: {}.",
                             absolute_path, err
                         );
                     }
@@ -53,7 +53,7 @@ fn main() -> ExitCode {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!(
-                "An unrecoverable error occured. Stopping the webserver: {}",
+                "An unrecoverable error occured. Stopping the webserver with error: {}.",
                 error
             );
             ExitCode::FAILURE
