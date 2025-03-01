@@ -185,15 +185,8 @@ impl HttpRequest<'_> {
     /// assert_eq!(subdomain, None);
     /// ```
     pub fn subdomain(&self, domain_names: Option<Vec<&str>>) -> Option<&str> {
-        if self.header.is_none() || domain_names.is_none() {
-            return None;
-        }
-        let domain_names = domain_names.unwrap();
-
-        let header = self
-            .header
-            .as_ref()
-            .expect("`self.header` should be `Some`");
+        let domain_names = domain_names?;
+        let header = self.header.as_ref()?;
         let host = match header.get_value(HttpFieldName::Host.to_string().as_str()) {
             None => return None,
             Some(host) => host,
@@ -222,35 +215,6 @@ impl HttpRequest<'_> {
 
         None
     }
-
-    // pub fn get_target_filepath(&self) -> Filepath {
-    //     let file_path = match &self.target {
-    //         None => return Filepath::empty(),
-    //         Some(target) => {
-    //             if target.len() <= 0 {
-    //                 return Filepath::empty()
-    //             }
-    //             match target.find('?') {
-    //                 None => self.target.expect("`self.target` should be `Some`"),
-    //                 Some(index) => self.target.expect("`self.target` should be `Some`")[..index],
-    //             }
-    //         },
-    //     }.as_str();
-
-    //     let directory_delimiter = '/';
-    //     let (directory, file_name) = match file_path.rfind(directory_delimiter) {
-    //         None => ("", file_path),
-    //         Some(index) => {
-    //             let file_name_start_index = if index >= file_path.len() - 1 { index } else { index + 1 };
-    //             (&file_path[..=index], &file_path[(file_name_start_index)..])
-    //         },
-    //     };
-
-    //     Filepath {
-    //         directory: directory.to_owned(),
-    //         filename: file_name.to_owned(),
-    //     }
-    // }
 
     /// Returns a byte array containing the bytes up until (but excluding) the first occurrence of the `delimiter`.
     ///

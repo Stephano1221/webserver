@@ -55,11 +55,10 @@ impl HttpTarget {
     /// The new `path` will be `Some`.
     pub fn set_filename(&mut self, filename: &str) {
         let directory_delimiter = '/';
-        let old_directory = match self.directory() {
-            None => Some(directory_delimiter.to_string()),
-            Some(directory) => Some(directory.to_owned()),
+        let mut new_path = match self.directory() {
+            None => directory_delimiter.to_string(),
+            Some(directory) => directory.to_owned(),
         };
-        let mut new_path = old_directory.expect("`old_directory` should be `Some`");
         if !new_path.ends_with(directory_delimiter) {
             new_path.push(directory_delimiter);
         }
@@ -79,17 +78,17 @@ impl HttpTarget {
             if !new_path.ends_with(directory_delimiter) {
                 new_path.push(directory_delimiter);
             }
-            new_path.push_str(filename.expect("`filename` should be `Some`"));
+            new_path.push_str(filename.unwrap());
         }
         self.path = Some(new_path);
     }
 
     pub fn directory_count(&self) -> usize {
-        if let None = self.path {
+        if self.path.is_none() {
             return 0;
         }
         let directory_delimiter = '/';
-        let full_path = &self.path.as_ref().expect("`path` should be `Some`")[..];
+        let full_path = &self.path.as_ref().unwrap()[..];
         full_path
             .chars()
             .filter(|c| *c == directory_delimiter)
@@ -97,11 +96,8 @@ impl HttpTarget {
     }
 
     pub fn n_directories(&self, directories: usize) -> Option<&str> {
-        if let None = self.path {
-            return None;
-        }
         let directory_delimiter = '/';
-        let full_path = &self.path.as_ref().expect("`path` should be `Some`")[..];
+        let full_path = &self.path.as_ref()?[..];
         let mut unprocessed_path = &full_path[..];
         let mut found_directories = 0;
         let mut last_directory_separator_index = 0;
