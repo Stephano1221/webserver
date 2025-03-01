@@ -59,7 +59,7 @@ fn get_config_path() -> PathBuf {
     #[cfg(target_family = "windows")]
     {
         let parent_directory =
-            env::var("LOCALAPPDATA").expect("LOCALAPPDATA environment variable should be set");
+            env::var("LOCALAPPDATA").unwrap_or_else(|_| String::from("C:\\ProgramData"));
         let config_path =
             format!("{parent_directory}\\{company_name}\\{app_name}\\{config_filename}");
         PathBuf::from(&config_path)
