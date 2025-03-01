@@ -13,17 +13,23 @@ use crate::{
     server,
 };
 
-pub fn start_listener(config: &Config) {
+pub fn start_listener(config: &Config) -> Result<(), Box<dyn Error>> {
     let local_ipv4_address = get_local_ipv4_address();
-    let socket = SocketAddr::new(local_ipv4_address, config.global.port);
-    let tcp_listener =
-        TcpListener::bind(socket).expect("Should be able to bind to local IP address");
+    let socket_address = SocketAddr::new(local_ipv4_address, config.global.port);
+    let tcp_listener = match TcpListener::bind(socket_address) {
+        Ok(listener) => listener,
+        Err(error) => {
+            eprintln!("Unable to bind to address {}", socket_address);
+            return Err(Box::new(error));
+        }
+    };
     println!("Server started.");
-    println!("Local IPv4 Address: {}", socket.ip());
+    println!("Local IPv4 Address: {}", socket_address.ip());
     for stream in tcp_listener.incoming() {
         let stream = stream.expect("`stream` should always be `Some()`");
         accept_connection(config, stream);
     }
+    Ok(())
 }
 
 pub fn get_local_ipv4_address() -> IpAddr {

@@ -15,8 +15,9 @@ use crate::{
 };
 
 /// Starts the server with the specified configuration
-pub fn start_server(config: &Config) {
-    network::start_listener(config);
+pub fn start_server(config: &Config) -> Result<(), Box<dyn Error>> {
+    network::start_listener(config)?;
+    Ok(())
 }
 
 /// Handles a HTTP request
