@@ -34,7 +34,16 @@ pub fn start_listener(config: &Config) -> Result<(), Box<dyn Error>> {
     println!("Server started.");
     println!("Local IPv4 Address: {}.", socket_address.ip());
     for stream in tcp_listener.incoming() {
-        let stream = stream.expect("`stream` should always be `Some()`");
+        let stream = match stream {
+            Ok(stream) => stream,
+            Err(error) => {
+                eprintln!(
+                    "Unable to accept incoming connection with error: {}.",
+                    error
+                );
+                continue;
+            }
+        };
         accept_connection(config, stream);
     }
     Ok(())
@@ -42,9 +51,16 @@ pub fn start_listener(config: &Config) -> Result<(), Box<dyn Error>> {
 
 fn accept_connection(config: &Config, mut stream: TcpStream) {
     let now = Instant::now();
-    let stream_ip_address = stream
-        .peer_addr()
-        .expect("`Stream` should contain the socket address of the remote peer");
+    let stream_ip_address = match stream.peer_addr() {
+        Ok(socket_address) => socket_address,
+        Err(error) => {
+            eprintln!(
+                "Unable to determine IP address of incoming connection with error: {}.",
+                error
+            );
+            return;
+        }
+    };
     println!("Connection request from: {stream_ip_address}.");
 
     if let Err(error) = stream.set_nonblocking(true) {
@@ -82,9 +98,9 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
                 return;
             }
         }
-        let bytes_read = buf_reader.read(&mut buf);
-        if let Err(error) = bytes_read {
-            match error.kind() {
+        match buf_reader.read(&mut buf) {
+            Ok(bytes) => buf_received_bytes += bytes,
+            Err(error) => match error.kind() {
                 io::ErrorKind::Interrupted => continue,
                 io::ErrorKind::WouldBlock => {
                     sleep(Duration::from_millis(1));
@@ -94,9 +110,8 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
                     eprintln!("Error reading from stream: {}.", error);
                     return;
                 }
-            }
-        }
-        buf_received_bytes += bytes_read.expect("`bytes_read` should be `Ok` here");
+            },
+        };
         if buf_received_bytes > buffer_maximum_size_bytes {
             server::handle_request(
                 config,
