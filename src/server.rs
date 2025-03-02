@@ -15,8 +15,9 @@ use crate::{
 };
 
 /// Starts the server with the specified configuration
-pub fn start_server(config: &Config) {
-    network::start_listener(config);
+pub fn start_server(config: &Config) -> Result<(), Box<dyn Error>> {
+    network::start_listener(config)?;
+    Ok(())
 }
 
 /// Handles a HTTP request
@@ -29,7 +30,7 @@ pub fn handle_request(
     match &http_response {
         None => (),
         Some(response) => match send_response(stream, &response) {
-            Err(error) => eprintln!("Error sending response: {}", error),
+            Err(error) => eprintln!("Error sending response: {}.", error),
             Ok(_) => (),
         },
     }
@@ -42,7 +43,7 @@ pub fn get_response<'a>(
 ) -> Option<HttpResponse> {
     match http_request {
         Err((error, status_code)) => {
-            eprintln!("Error getting response: {}", error);
+            eprintln!("Error getting response: {}.", error);
             Some(HttpResponse::new(
                 &HttpVersion::Http1Dot1,
                 &status_code,
@@ -52,10 +53,7 @@ pub fn get_response<'a>(
         }
         Ok(request) => {
             println!("{:#?}", request);
-            let method = request
-                .method
-                .as_ref()
-                .expect("`request.method` should be `Some`");
+            let method = request.method.as_ref().unwrap();
             let result: Result<HttpResponse, (HttpResponse, Box<dyn Error>)> = match method {
                 HttpMethod::Get => http_get(config, request),
                 HttpMethod::Head => http_head(config, request),
@@ -97,17 +95,8 @@ fn http_get(
     http_request: &mut HttpRequest,
 ) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
     let mut http_response = http_head(config, http_request)?;
-    let http_version = http_request
-        .version
-        .as_ref()
-        .expect("`http_request.version` should be `Some`");
-    let path = http_request
-        .target
-        .as_ref()
-        .expect("`http_request.target` should be `Some`")
-        .path
-        .as_ref()
-        .expect("`http_request.target.path` should be `Some`");
+    let http_version = http_request.version.as_ref().unwrap();
+    let path = http_request.target.as_ref().unwrap().path.as_ref().unwrap();
 
     let mut file = match OpenOptions::new().read(true).open(path) {
         Err(error) => {
@@ -144,10 +133,7 @@ fn http_get(
         http_response.header = Some(HttpHeader::new());
     };
 
-    let header = http_response
-        .header
-        .as_mut()
-        .expect("`http_response.header` should be `Some`");
+    let header = http_response.header.as_mut().unwrap();
     header.insert(
         HttpFieldName::ContentLength.to_string().as_str(),
         bytes.to_string().as_str(),
@@ -162,18 +148,9 @@ fn http_head(
 ) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
     add_target_prefix(config, http_request);
     set_filename_if_none(http_request, &config.global.default_filename);
-    let http_version = http_request
-        .version
-        .as_ref()
-        .expect("`http_request.version` should be `Some`");
+    let http_version = http_request.version.as_ref().unwrap();
 
-    let path = http_request
-        .target
-        .as_ref()
-        .expect("`http_request.target` should be `Some`")
-        .path
-        .as_ref()
-        .expect("`http_request.target.path` should be `Some`");
+    let path = http_request.target.as_ref().unwrap().path.as_ref().unwrap();
     let file = match OpenOptions::new().read(true).open(path) {
         Err(error) => {
             return Err((
@@ -286,10 +263,7 @@ fn http_trace(
 
 /// Gets the response for when the method in a HTTP request is not recognised/implemented by the server.
 fn not_implemented_response(http_request: &mut HttpRequest) -> HttpResponse {
-    let http_version = http_request
-        .version
-        .as_ref()
-        .expect("`http_request.version` should be `Some`");
+    let http_version = http_request.version.as_ref().unwrap();
     HttpResponse::new(
         http_version,
         &HttpStatusCode::NotImplemented501,
@@ -320,10 +294,7 @@ fn set_body_not_found(
         http_response.header = Some(HttpHeader::new());
     };
 
-    let header = http_response
-        .header
-        .as_mut()
-        .expect("`http_response.header` should be `Some`");
+    let header = http_response.header.as_mut().unwrap();
     header.insert(
         HttpFieldName::ContentLength.to_string().as_str(),
         bytes.to_string().as_str(),
@@ -350,13 +321,10 @@ fn get_not_found_path(config: &Config, http_request: &HttpRequest) -> String {
 /// to make it the full target path.
 fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
     let prefix = get_target_prefix(config, http_request);
-    if let None = http_request.target {
+    if http_request.target.is_none() {
         http_request.target = Some(HttpTarget::new());
     }
-    let target = http_request
-        .target
-        .as_mut()
-        .expect("`http_request.target` should be `Some`");
+    let target = http_request.target.as_mut().unwrap();
 
     let mut path = match &target.path {
         None => String::new(),
@@ -419,11 +387,7 @@ fn set_filename(http_request: &mut HttpRequest, filename: &str) {
     if http_request.target.is_none() {
         http_request.target = Some(HttpTarget::new());
     }
-    http_request
-        .target
-        .as_mut()
-        .expect("`http_request.target` should be `Some`")
-        .set_filename(filename);
+    http_request.target.as_mut().unwrap().set_filename(filename);
 }
 
 /// Sets the target filename for a [`HttpRequest`] only if it doesn't already have one.
