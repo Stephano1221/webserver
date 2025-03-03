@@ -87,14 +87,14 @@ pub fn send_response(
     config: &Config,
     stream: &mut TcpStream,
     http_response: &HttpResponse,
-    time_started_request: Instant,
+    time_request_started: Instant,
 ) -> Result<(), Box<dyn Error>> {
     println!("Response: {}", http_response.to_string());
     network::send_bytes(
         config,
         stream,
         &http_response.as_bytes(),
-        time_started_request,
+        time_request_started,
     )?;
     Ok(())
 }

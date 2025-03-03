@@ -143,21 +143,21 @@ pub fn send_bytes(
     config: &Config,
     stream: &mut TcpStream,
     bytes: &[u8],
-    time_started_request: Instant,
+    time_request_started: Instant,
 ) -> Result<(), Box<dyn Error>> {
     let stream_ip_address = stream.peer_addr().unwrap();
     let mut total_sent_bytes = 0;
     while total_sent_bytes < bytes.len() {
         if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
             if timeout_seconds > 0
-                && time_started_request.elapsed().as_secs() >= timeout_seconds as u64
+                && time_request_started.elapsed().as_secs() >= timeout_seconds as u64
             {
                 return Err(Box::new(io::Error::new(
                     io::ErrorKind::TimedOut,
                     format!(
                         "Request from {} timed out after {}ms while writing",
                         stream_ip_address,
-                        time_started_request.elapsed().as_millis()
+                        time_request_started.elapsed().as_millis()
                     ),
                 )));
             }
