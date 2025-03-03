@@ -24,7 +24,7 @@ impl HttpMethod {
             "CONNECT" => Some(HttpMethod::Connect),
             "OPTIONS" => Some(HttpMethod::Options),
             "TRACE" => Some(HttpMethod::Trace),
-            _ => None
+            _ => None,
         }
     }
 }

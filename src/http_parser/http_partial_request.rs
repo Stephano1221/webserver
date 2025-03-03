@@ -10,7 +10,7 @@ impl PartialHttpRequest<'_> {
     pub fn new() -> Self {
         PartialHttpRequest {
             request: HttpRequest::default(),
-            next_byte: 0
+            next_byte: 0,
         }
     }
 

@@ -9,12 +9,12 @@ pub enum HttpFieldName {
 
 impl HttpFieldName {
     pub fn from_str(field_name: &str) -> Option<Self> {
-        // As field names are case-insensitive, `field_name` and the cases below must be the same case
+        // Field names are case-insensitive
         match field_name.trim().to_ascii_lowercase().as_str() {
             "content-length" => Some(Self::ContentLength),
             "content-type" => Some(Self::ContentType),
             "host" => Some(Self::Host),
-            _ => None
+            _ => None,
         }
     }
 }

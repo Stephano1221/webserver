@@ -1,36 +1,64 @@
-use std::{env, path::{self, PathBuf}};
+use std::{
+    env,
+    path::{self, PathBuf},
+    process::ExitCode,
+};
 
 use webserver::{config::Config, server};
 
-fn main() {
+fn main() -> ExitCode {
     let config_path = get_config_path();
     let config = match Config::from_toml_file(&config_path) {
         Ok(config) => config,
-        Err(e) => {
+        Err(error) => {
             let absolute_path = match path::absolute(&config_path) {
                 Ok(path) => path.to_string_lossy().to_string(),
                 Err(_) => config_path.to_string_lossy().to_string(),
             };
-            let default_message = format!("Unable to read configuration file: {e}. Please ensure that a valid configuration file is found at: {absolute_path}");
-            if let Some(err) = e.downcast_ref::<std::io::Error>() {
-                match err.kind() {
+            let default_message = format!(
+                "Unable to read configuration file: {error}. Please ensure that a valid configuration file is found at: {absolute_path}."
+            );
+            match error.downcast_ref::<std::io::Error>() {
+                Some(err) => match err.kind() {
                     std::io::ErrorKind::NotFound => {
-                        eprintln!("Configuration file not found. Please ensure that a valid configuration file is found at: {}", absolute_path);
-                    },
+                        eprintln!(
+                            "Configuration file not found. Please ensure that a valid configuration file is found at: {}.",
+                            absolute_path
+                        );
+                    }
                     std::io::ErrorKind::PermissionDenied => {
-                        eprintln!("Permission denied reading configuration file at: {}", absolute_path);
-                    },
+                        eprintln!(
+                            "Permission denied reading configuration file at: {}.",
+                            absolute_path
+                        );
+                    }
                     _ => eprintln!("{}", default_message),
-                }
-            } else if let Some(err) = e.downcast_ref::<toml::de::Error>() {
-                eprintln!("An error occured while parsing the configuration file. Please ensure that the configuration file at {} is valid: {}", absolute_path, err);
-            } else {
-                eprintln!("{}", default_message);
+                },
+                None => match error.downcast_ref::<toml::de::Error>() {
+                    Some(err) => {
+                        eprintln!(
+                            "An error occured while parsing the configuration file. Please ensure that the configuration file at {} is valid: {}.",
+                            absolute_path, err
+                        );
+                    }
+                    _ => {
+                        eprintln!("{}", default_message);
+                    }
+                },
             }
-            return
+            return ExitCode::FAILURE;
         }
     };
-    server::start_server(&config);
+    match server::start_server(&config) {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!(
+                "An unrecoverable error occured. Stopping the webserver with error: {}.",
+                error
+            );
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn get_config_path() -> PathBuf {
@@ -40,15 +68,21 @@ fn get_config_path() -> PathBuf {
 
     #[cfg(target_family = "windows")]
     {
-        let parent_directory = env::var("LOCALAPPDATA").expect("LOCALAPPDATA environment variable should be set");
-        let config_path = format!("{parent_directory}\\{company_name}\\{app_name}\\{config_filename}");
+        let parent_directory =
+            env::var("LOCALAPPDATA").unwrap_or_else(|_| String::from("C:\\ProgramData"));
+        let config_path =
+            format!("{parent_directory}\\{company_name}\\{app_name}\\{config_filename}");
         PathBuf::from(&config_path)
     }
 
     #[cfg(target_family = "unix")]
     {
         let parent_directory = "/etc";
-        let config_path = format!("{parent_directory}/{}/{}/{config_filename}", company_name.to_lowercase(), app_name.to_lowercase());
+        let config_path = format!(
+            "{parent_directory}/{}/{}/{config_filename}",
+            company_name.to_lowercase(),
+            app_name.to_lowercase()
+        );
         PathBuf::from(&config_path)
     }
 }
