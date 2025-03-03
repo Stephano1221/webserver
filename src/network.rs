@@ -89,9 +89,10 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
                         io::ErrorKind::Other.into(),
                         HttpStatusCode::RequestTimeout408,
                     )),
+                    now,
                 );
                 println!(
-                    "Request from {} timed out after {}ms.",
+                    "Request from {} timed out after {}ms while reading.",
                     stream_ip_address,
                     now.elapsed().as_millis()
                 );
@@ -120,6 +121,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
                     io::ErrorKind::Other.into(),
                     HttpStatusCode::ContentTooLarge413,
                 )),
+                now,
             );
             return;
         }
@@ -129,7 +131,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
         }
     };
 
-    server::handle_request(config, &mut stream, &mut http_request);
+    server::handle_request(config, &mut stream, &mut http_request, now);
     println!(
         "Handled request from {} in {}ms.",
         stream_ip_address,
@@ -137,7 +139,42 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
     );
 }
 
-pub fn send_bytes(stream: &mut TcpStream, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
-    stream.write_all(bytes)?;
+pub fn send_bytes(
+    config: &Config,
+    stream: &mut TcpStream,
+    bytes: &[u8],
+    time_request_started: Instant,
+) -> Result<(), Box<dyn Error>> {
+    let stream_ip_address = stream.peer_addr().unwrap();
+    let mut total_sent_bytes = 0;
+    while total_sent_bytes < bytes.len() {
+        if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
+            if timeout_seconds > 0
+                && time_request_started.elapsed().as_secs() >= timeout_seconds as u64
+            {
+                return Err(Box::new(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!(
+                        "Request from {} timed out after {}ms while writing",
+                        stream_ip_address,
+                        time_request_started.elapsed().as_millis()
+                    ),
+                )));
+            }
+        }
+        match stream.write(&bytes[total_sent_bytes..]) {
+            Ok(sent_bytes) => total_sent_bytes += sent_bytes,
+            Err(error) => match error.kind() {
+                io::ErrorKind::Interrupted => continue,
+                io::ErrorKind::WouldBlock => {
+                    sleep(Duration::from_millis(1));
+                    continue;
+                }
+                _ => {
+                    return Err(Box::new(error));
+                }
+            },
+        };
+    }
     Ok(())
 }

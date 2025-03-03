@@ -3,6 +3,7 @@ use std::{
     fs::OpenOptions,
     io::{self, Read},
     net::TcpStream,
+    time::Instant,
 };
 
 use crate::{
@@ -25,11 +26,12 @@ pub fn handle_request(
     config: &Config,
     stream: &mut TcpStream,
     http_request: &mut Result<HttpRequest, (io::Error, HttpStatusCode)>,
+    time_request_started: Instant,
 ) {
     let http_response = get_response(config, http_request);
     match &http_response {
         None => (),
-        Some(response) => match send_response(stream, &response) {
+        Some(response) => match send_response(config, stream, &response, time_request_started) {
             Err(error) => eprintln!("Error sending response: {}.", error),
             Ok(_) => (),
         },
@@ -82,11 +84,18 @@ pub fn get_response<'a>(
 
 /// Sends a [`HttpResponse`] to the specified `stream`.
 pub fn send_response(
+    config: &Config,
     stream: &mut TcpStream,
     http_response: &HttpResponse,
+    time_request_started: Instant,
 ) -> Result<(), Box<dyn Error>> {
     println!("Response: {}", http_response.to_string());
-    network::send_bytes(stream, &http_response.as_bytes())?;
+    network::send_bytes(
+        config,
+        stream,
+        &http_response.as_bytes(),
+        time_request_started,
+    )?;
     Ok(())
 }
 
