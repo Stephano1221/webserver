@@ -145,7 +145,7 @@ pub fn send_bytes(
     bytes: &[u8],
     time_request_started: Instant,
 ) -> Result<(), Box<dyn Error>> {
-    let stream_ip_address = stream.peer_addr().unwrap();
+    let stream_ip_address = stream.peer_addr()?;
     let mut total_sent_bytes = 0;
     while total_sent_bytes < bytes.len() {
         if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
