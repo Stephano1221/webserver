@@ -3,6 +3,7 @@ use std::{
     fs::OpenOptions,
     io::{self, Read},
     net::TcpStream,
+    path::{self},
     time::Instant,
 };
 
@@ -55,6 +56,9 @@ pub fn get_response<'a>(
         }
         Ok(request) => {
             println!("{:#?}", request);
+            if let Some(response) = request_setup(config, request) {
+                return Some(response);
+            }
             let method = request.method.as_ref().unwrap();
             let result: Result<HttpResponse, (HttpResponse, Box<dyn Error>)> = match method {
                 HttpMethod::Get => http_get(config, request),
@@ -67,7 +71,7 @@ pub fn get_response<'a>(
                 HttpMethod::Trace => http_trace(config, request),
             };
             match result {
-                Err((mut response, error)) => {
+                Err((mut response, _error)) => {
                     match response.status_code {
                         HttpStatusCode::NotFound404 => {
                             set_body_not_found(config, request, &mut response)
@@ -97,6 +101,55 @@ pub fn send_response(
         time_request_started,
     )?;
     Ok(())
+}
+
+fn request_setup(config: &Config, http_request: &mut HttpRequest) -> Option<HttpResponse> {
+    add_target_prefix(config, http_request);
+    set_filename_if_none(http_request, &config.global.default_filename);
+    match is_a_directory_traversal_attack(config, http_request) {
+        Err(error) => {
+            eprintln!(
+                "Error determining if request is a directory traversal attack: {}.",
+                error
+            );
+            return Some(HttpResponse::new(
+                &HttpVersion::Http1Dot1,
+                &HttpStatusCode::InternalServerError500,
+                &None,
+                &None,
+            ));
+        }
+        Ok(is_directory_traversal_attack) => {
+            if is_directory_traversal_attack {
+                println!("Prevented directory traversal attack.");
+                let mut response = HttpResponse::new(
+                    &HttpVersion::Http1Dot1,
+                    &HttpStatusCode::NotFound404,
+                    &None,
+                    &None,
+                );
+                set_body_not_found(config, http_request, &mut response);
+                return Some(response);
+            }
+        }
+    }
+    None
+}
+
+fn is_a_directory_traversal_attack(
+    config: &Config,
+    http_request: &HttpRequest,
+) -> Result<bool, Box<dyn Error>> {
+    let path = http_request.target.as_ref().unwrap().path.as_ref().unwrap();
+    let expected_path_prefix = &get_target_prefix(config, http_request);
+    // We're checking the path before following symlinks so that symlinks can be used properly.
+    // We must thus ensure that clients can never create/edit symlinks, as they could use
+    // them to bypass this directory traversal attack check.
+    let absolute_path = path::absolute(path)?;
+    if !absolute_path.starts_with(expected_path_prefix) {
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 fn http_get(
@@ -155,8 +208,6 @@ fn http_head(
     config: &Config,
     http_request: &mut HttpRequest,
 ) -> Result<HttpResponse, (HttpResponse, Box<dyn Error>)> {
-    add_target_prefix(config, http_request);
-    set_filename_if_none(http_request, &config.global.default_filename);
     let http_version = http_request.version.as_ref().unwrap();
 
     let path = http_request.target.as_ref().unwrap().path.as_ref().unwrap();
@@ -316,7 +367,7 @@ fn set_body_not_found(
 ///
 /// This is on a per subdomain basis, with each full subdomain having its own 'not-found' file.
 fn get_not_found_path(config: &Config, http_request: &HttpRequest) -> String {
-    let directory_delimiter = '/';
+    let directory_delimiter = std::path::MAIN_SEPARATOR;
     let mut path = get_target_prefix(config, http_request);
 
     if !path.ends_with(directory_delimiter) {
@@ -347,6 +398,7 @@ fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
 /// Get the directory prefix for the specified root or subdomain(s) that can be prefixed to the target
 /// to get the full target path.
 fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
+    let directory_delimiter = std::path::MAIN_SEPARATOR;
     match http_request.subdomain(
         config
             .global
@@ -355,13 +407,17 @@ fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
             .map(|s| s.iter().map(|s| s.as_str()).collect()),
     ) {
         None => format!(
-            "{}/{}",
-            config.global.parent_directory, config.global.primary_domain_folder_name
+            "{}{}{}",
+            config.global.parent_directory,
+            directory_delimiter,
+            config.global.primary_domain_folder_name
         ),
         Some(subdomain) => format!(
-            "{}/{}/{}",
+            "{}{}{}{}{}",
             config.global.parent_directory,
+            directory_delimiter,
             config.global.subdomains_folder_name,
+            directory_delimiter,
             subdomain_as_path(subdomain)
         ),
     }
