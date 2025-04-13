@@ -106,7 +106,7 @@ pub fn send_response(
 fn request_setup(config: &Config, http_request: &mut HttpRequest) -> Option<HttpResponse> {
     add_target_prefix(config, http_request);
     set_filename_if_none(http_request, &config.global.default_filename);
-    match is_a_directory_traversal_attack(config, http_request) {
+    match is_a_directory_traversal_attack(http_request) {
         Err(error) => {
             eprintln!(
                 "Error determining if request is a directory traversal attack: {}.",
@@ -137,19 +137,17 @@ fn request_setup(config: &Config, http_request: &mut HttpRequest) -> Option<Http
 }
 
 fn is_a_directory_traversal_attack(
-    config: &Config,
     http_request: &HttpRequest,
-) -> Result<bool, Box<dyn Error>> {
+) -> bool {
     let path = http_request.target.as_ref().unwrap().path.as_ref().unwrap();
-    let expected_path_prefix = &get_target_prefix(config, http_request);
-    // We're checking the path before following symlinks so that symlinks can be used properly.
-    // We must thus ensure that clients can never create/edit symlinks, as they could use
-    // them to bypass this directory traversal attack check.
-    let absolute_path = path::absolute(path)?;
-    if !absolute_path.starts_with(expected_path_prefix) {
-        return Ok(true);
+    // This could also be done by ensuring that the canonical path starts with the
+    // expected target prefix path, but this would incur another filesystem call, and
+    // potentially cause issues with symlinks if support is added for them. A directory
+    // whitelist would mitigate the symlink issue.
+    if path.contains("..") {
+        return true;
     }
-    Ok(false)
+    false
 }
 
 fn http_get(
