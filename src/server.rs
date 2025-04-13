@@ -106,39 +106,21 @@ pub fn send_response(
 fn request_setup(config: &Config, http_request: &mut HttpRequest) -> Option<HttpResponse> {
     add_target_prefix(config, http_request);
     set_filename_if_none(http_request, &config.global.default_filename);
-    match is_a_directory_traversal_attack(http_request) {
-        Err(error) => {
-            eprintln!(
-                "Error determining if request is a directory traversal attack: {}.",
-                error
-            );
-            return Some(HttpResponse::new(
-                &HttpVersion::Http1Dot1,
-                &HttpStatusCode::InternalServerError500,
-                &None,
-                &None,
-            ));
-        }
-        Ok(is_directory_traversal_attack) => {
-            if is_directory_traversal_attack {
-                println!("Prevented directory traversal attack.");
-                let mut response = HttpResponse::new(
-                    &HttpVersion::Http1Dot1,
-                    &HttpStatusCode::NotFound404,
-                    &None,
-                    &None,
-                );
-                set_body_not_found(config, http_request, &mut response);
-                return Some(response);
-            }
-        }
+    if is_a_directory_traversal_attack(http_request) {
+        println!("Prevented directory traversal attack.");
+        let mut response = HttpResponse::new(
+            &HttpVersion::Http1Dot1,
+            &HttpStatusCode::NotFound404,
+            &None,
+            &None,
+        );
+        set_body_not_found(config, http_request, &mut response);
+        return Some(response);
     }
     None
 }
 
-fn is_a_directory_traversal_attack(
-    http_request: &HttpRequest,
-) -> bool {
+fn is_a_directory_traversal_attack(http_request: &HttpRequest) -> bool {
     let path = http_request.target.as_ref().unwrap().path.as_ref().unwrap();
     // This could also be done by ensuring that the canonical path starts with the
     // expected target prefix path, but this would incur another filesystem call, and
