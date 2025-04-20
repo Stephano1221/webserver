@@ -124,12 +124,9 @@ fn is_a_directory_traversal_attack(http_request: &HttpRequest) -> bool {
     let path = http_request.target.as_ref().unwrap().path.as_ref().unwrap();
     // This could also be done by ensuring that the canonical path starts with the
     // expected target prefix path, but this would incur another filesystem call, and
-    // potentially cause issues with symlinks if support is added for them. A directory
-    // whitelist would mitigate the symlink issue.
-    if path.contains("..") {
-        return true;
-    }
-    false
+    // potentially cause issues with soft links (symlinks), but not hard links.
+    // A directory whitelist would mitigate the symlink issue.
+    path.contains("..")
 }
 
 fn http_get(
@@ -357,8 +354,9 @@ fn get_not_found_path(config: &Config, http_request: &HttpRequest) -> String {
     path
 }
 
-/// Adds the directory prefix for the specified root or subdomain(s) to the target
-/// to make it the full target path.
+/// Adds the directory prefix for the specified root or subdomain(s) to the target.
+///
+/// This can either be absolute or relative, depending on `parent_directory` in `config`.
 fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
     let prefix = get_target_prefix(config, http_request);
     if http_request.target.is_none() {
@@ -375,8 +373,9 @@ fn add_target_prefix(config: &Config, http_request: &mut HttpRequest) {
     target.path = Some(path);
 }
 
-/// Get the directory prefix for the specified root or subdomain(s) that can be prefixed to the target
-/// to get the full target path.
+/// Get the directory prefix for the specified root or subdomain(s), which can then be prefixed to the target.
+///
+/// This can either be absolute or relative, depending on `parent_directory` in `config`.
 fn get_target_prefix(config: &Config, http_request: &HttpRequest) -> String {
     let directory_delimiter = std::path::MAIN_SEPARATOR;
     match http_request.subdomain(

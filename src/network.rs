@@ -65,7 +65,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
 
     if let Err(error) = stream.set_nonblocking(true) {
         eprintln!(
-            "Unable to set nonblocking. Dropping connection to prevent blocking with error: {}.",
+            "Unable to set nonblocking. Dropping connection to prevent blocking other connections with error: {}.",
             error
         );
         return;
