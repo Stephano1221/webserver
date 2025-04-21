@@ -85,10 +85,14 @@ jobs:
       - name: Prerelease Option
         id: prerelease
         run: |
+          echo "Input: ${{ inputs.pre-release }}"
           if [ "${{ inputs.pre-release }}" == 'true' ]; then
+            echo "Setting variables"
             echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT"
             echo "latest=--latest=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "Prerelease: $prerelease"
+          echo "latest: $latest"
 
       - name: Create Release
         run: |
