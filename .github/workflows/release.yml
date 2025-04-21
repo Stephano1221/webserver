@@ -35,6 +35,7 @@ jobs:
 
       - name: Print Rust Version
         run: rustup --version
+        continue-on-error: true
 
       - name: Build
         run: cargo build --release --verbose
