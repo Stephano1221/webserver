@@ -12,6 +12,8 @@ on:
 env:
   GH_TOKEN: ${{ github.token }}
   build_path: target/release
+  executable: webserver
+  executable_display_label_prefix: webserver-${{ inputs.version }}
 
 permissions:
   contents: write
@@ -47,10 +49,10 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: webserver-${{ matrix.os }}
+          name: ${{ env.executable }}-${{ matrix.os }}
           path: |
-            ${{ env.build_path }}/webserver
-            ${{ env.build_path }}/webserver.exe
+            ${{ env.build_path }}/${{ env.executable}}
+            ${{ env.build_path }}/${{ env.executable}}.exe
 
   release:
     needs: build
@@ -66,4 +68,8 @@ jobs:
 
       - name: Create Release
         run: |
-          gh release create ${{ inputs.version }} --draft --generate-notes ${{ env.build_path }}/webserver-ubuntu-latest/webserver#webserver-${{ inputs.version }}-linux-x64 ${{ env.build_path }}/webserver-ubuntu-24.04-arm/webserver#webserver-${{ inputs.version }}-linux-arm64 ${{ env.build_path }}/webserver-windows-latest/webserver.exe#webserver-${{ inputs.version }}-windows-x64.exe LICENSE.txt
+          gh release create ${{ inputs.version }} --draft --generate-notes \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}#${{ env.executable_display_label_prefix }}-linux-x64 \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}#${{ env.executable_display_label_prefix }}-linux-arm64 \
+            ${{ env.build_path }}/${{ env.executable }}-windows-latest/${{ env.executable}}.exe#${{ env.executable_display_label_prefix }}-windows-x64.exe \
+            LICENSE.txt
