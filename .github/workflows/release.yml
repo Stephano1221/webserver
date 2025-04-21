@@ -5,9 +5,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version number to release (e.g., "v1.2.3")
-        type: string
         required: true
+        type: string
+        description: Version number to release (e.g., "v1.2.3")
+      pre-release:
+        required: false
+        type: boolean
+        description: Is this a pre-release (e.g., alpha, beta, rc)?
+        default: false
 
 env:
   GH_TOKEN: ${{ github.token }}
@@ -31,13 +36,13 @@ jobs:
       - name: Cache Dependencies
         uses: actions/cache@v4
         with:
+          key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Print Rust Version
         run: rustup --version
@@ -76,9 +81,16 @@ jobs:
           mv ${{ env.build_path }}/${{ env.executable }}-windows-latest/${{ env.executable}}.exe \
             ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-${{ inputs.version }}-windows-x64.exe
 
+      - name: Prerelease Option
+        id: prerelease
+        run: |
+          if [ "${{ inputs.pre-release }}" == "true" ]; then
+            echo "prerelease=--prerelease" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         run: |
-          gh release create ${{ inputs.version }} --draft --generate-notes \
+          gh release create ${{ inputs.version }} --draft --generate-notes --target ${{ github.ref_name }} ${{ steps.prerelease.outputs.prerelease }} \
             ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-${{ inputs.version }}-linux-x64 \
             ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-${{ inputs.version }}-linux-arm64 \
             ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-${{ inputs.version }}-windows-x64.exe \
