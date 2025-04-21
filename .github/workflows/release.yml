@@ -13,6 +13,9 @@ env:
   GH_TOKEN: ${{ github.token }}
   build_path: target/release
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
