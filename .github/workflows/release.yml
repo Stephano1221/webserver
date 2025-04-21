@@ -70,16 +70,16 @@ jobs:
       - name: Rename Files
         run: |
           mv ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}} \
-            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-linux-x64
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-${{ inputs.version }}-linux-x64
           mv ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}} \
-            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-linux-arm64
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-${{ inputs.version }}-linux-arm64
           mv ${{ env.build_path }}/${{ env.executable }}-windows-latest/${{ env.executable}}.exe \
-            ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-windows-x64.exe
+            ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-${{ inputs.version }}-windows-x64.exe
 
       - name: Create Release
         run: |
           gh release create ${{ inputs.version }} --draft --generate-notes \
-            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-linux-x64 \
-            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-linux-arm64 \
-            ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-windows-x64.exe \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-${{ inputs.version }}-linux-x64 \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-${{ inputs.version }}-linux-arm64 \
+            ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-${{ inputs.version }}-windows-x64.exe \
             LICENSE.txt
