@@ -66,10 +66,20 @@ jobs:
         with:
           path: ${{ env.build_path }}
 
+        # This step is needed to prevent files having conflicting names when creating the release
+      - name: Rename Files
+        run: |
+          mv ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}} \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-linux-x64
+          mv ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}} \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-linux-arm64
+          mv ${{ env.build_path }}/${{ env.executable }}-windows-latest/${{ env.executable}}.exe \
+            ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-windows-x64.exe
+
       - name: Create Release
         run: |
           gh release create ${{ inputs.version }} --draft --generate-notes \
-            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}#${{ env.executable_display_label_prefix }}-linux-x64 \
-            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}#${{ env.executable_display_label_prefix }}-linux-arm64 \
-            ${{ env.build_path }}/${{ env.executable }}-windows-latest/${{ env.executable}}.exe#${{ env.executable_display_label_prefix }}-windows-x64.exe \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-linux-x64 \
+            ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-linux-arm64 \
+            ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-windows-x64.exe \
             LICENSE.txt
