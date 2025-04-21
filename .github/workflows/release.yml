@@ -8,7 +8,7 @@ on:
         required: true
         type: string
         description: Version number to release (e.g., "v1.2.3")
-      pre-release:
+      is-pre-release:
         required: false
         type: boolean
         description: Is this a pre-release (e.g., alpha, beta, rc)?
@@ -81,11 +81,10 @@ jobs:
           mv ${{ env.build_path }}/${{ env.executable }}-windows-latest/${{ env.executable}}.exe \
             ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-${{ inputs.version }}-windows-x64.exe
 
-        # TODO: Fix output being empty
       - name: Prerelease Option
         id: prerelease
         run: |
-          if [ '${{ inputs.pre-release }}' == 'true' ]; then
+          if [ '${{ inputs.is-pre-release }}' == 'true' ]; then
             echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT"
             echo "latest=--latest=false" >> "$GITHUB_OUTPUT"
           fi
