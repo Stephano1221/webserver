@@ -90,7 +90,7 @@ jobs:
 
       - name: Create Release
         run: |
-          gh release create ${{ inputs.version }} --draft --generate-notes --target ${{ github.ref_name }} ${{ steps.prerelease.outputs.prerelease }} \
+          gh release create ${{ inputs.version }} --draft --generate-notes --target "${{ github.ref_name }}" ${{ steps.prerelease.outputs.prerelease }} \
             ${{ env.build_path }}/${{ env.executable }}-ubuntu-latest/${{ env.executable}}-${{ inputs.version }}-linux-x64 \
             ${{ env.build_path }}/${{ env.executable }}-ubuntu-24.04-arm/${{ env.executable}}-${{ inputs.version }}-linux-arm64 \
             ${{ env.build_path }}/${{ env.executable}}-windows-latest/${{ env.executable}}-${{ inputs.version }}-windows-x64.exe \
