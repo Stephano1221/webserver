@@ -1,0 +1,64 @@
+name: Release
+run-name: Release ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version number to release (e.g., "v1.2.3")
+        type: string
+        required: true
+
+env:
+  build_path: target/release
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Print Rust Version
+        run: rustup --version
+
+      - name: Build
+        run: cargo build --release --verbose
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webserver-${{ matrix.os }}
+          path: |
+            ${{ env.build_path }}/webserver
+            ${{ env.build_path }}/webserver.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ env.build_path }}
+
+      - name: Create Release
+        run: |
+          gh release create ${{ inputs.version }} --draft --generate-notes ${{ env.build_path }}/webserver-ubuntu-latest/webserver#webserver-${{ inputs.version }}-linux-x64 ${{ env.build_path }}/webserver-ubuntu-24.04-arm/webserver#webserver-${{ inputs.version }}-linux-arm64 ${{ env.build_path }}/webserver-windows-latest/webserver.exe#webserver-${{ inputs.version }}-windows-x64.exe LICENSE.txt
