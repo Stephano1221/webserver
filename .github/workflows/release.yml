@@ -10,6 +10,7 @@ on:
         required: true
 
 env:
+  GH_TOKEN: ${{ github.token }}
   build_path: target/release
 
 jobs:
