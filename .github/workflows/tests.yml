@@ -2,6 +2,7 @@ name: Tests
 
 on:
   push:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -22,10 +23,11 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Print Rust Version
         run: rustup --version
+        continue-on-error: true
 
       - name: Build
         run: cargo build --verbose
