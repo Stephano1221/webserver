@@ -15,7 +15,7 @@ impl Filepath {
     }
 
     pub fn from_str(slice: &str) -> Result<Self, ()> {
-        let directory_delimiter = '/';
+        let directory_delimiter = std::path::MAIN_SEPARATOR;
         let file_extension_delimiter = '.';
         match slice.rfind(directory_delimiter) {
             None => Err(()),

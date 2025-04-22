@@ -65,7 +65,7 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
 
     if let Err(error) = stream.set_nonblocking(true) {
         eprintln!(
-            "Unable to set nonblocking. Dropping connection to prevent blocking with error: {}.",
+            "Unable to set nonblocking. Dropping connection to prevent blocking other connections with error: {}.",
             error
         );
         return;
@@ -80,24 +80,22 @@ fn accept_connection(config: &Config, mut stream: TcpStream) {
     let mut http_request = PartialHttpRequest::new();
 
     let mut http_request = loop {
-        if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
-            if timeout_seconds > 0 && now.elapsed().as_secs() >= timeout_seconds as u64 {
-                server::handle_request(
-                    config,
-                    &mut stream,
-                    &mut Err((
-                        io::ErrorKind::Other.into(),
-                        HttpStatusCode::RequestTimeout408,
-                    )),
-                    now,
-                );
-                println!(
-                    "Request from {} timed out after {}ms while reading.",
-                    stream_ip_address,
-                    now.elapsed().as_millis()
-                );
-                return;
-            }
+        if has_timed_out(config, now, 0) {
+            println!(
+                "Request from {} timed out after {}ms while reading.",
+                stream_ip_address,
+                now.elapsed().as_millis()
+            );
+            server::handle_request(
+                config,
+                &mut stream,
+                &mut Err((
+                    io::ErrorKind::Other.into(),
+                    HttpStatusCode::RequestTimeout408,
+                )),
+                now,
+            );
+            return;
         }
         match buf_reader.read(&mut buf) {
             Ok(bytes) => buf_received_bytes += bytes,
@@ -145,22 +143,20 @@ pub fn send_bytes(
     bytes: &[u8],
     time_request_started: Instant,
 ) -> Result<(), Box<dyn Error>> {
-    let stream_ip_address = stream.peer_addr().unwrap();
+    let stream_ip_address = stream.peer_addr()?;
+    let additional_milliseconds =
+        calculate_additional_milliseconds(config, time_request_started, 1);
     let mut total_sent_bytes = 0;
     while total_sent_bytes < bytes.len() {
-        if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
-            if timeout_seconds > 0
-                && time_request_started.elapsed().as_secs() >= timeout_seconds as u64
-            {
-                return Err(Box::new(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    format!(
-                        "Request from {} timed out after {}ms while writing",
-                        stream_ip_address,
-                        time_request_started.elapsed().as_millis()
-                    ),
-                )));
-            }
+        if has_timed_out(config, time_request_started, additional_milliseconds) {
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!(
+                    "Request from {} timed out after {}ms while writing",
+                    stream_ip_address,
+                    time_request_started.elapsed().as_millis()
+                ),
+            )));
         }
         match stream.write(&bytes[total_sent_bytes..]) {
             Ok(sent_bytes) => total_sent_bytes += sent_bytes,
@@ -177,4 +173,37 @@ pub fn send_bytes(
         };
     }
     Ok(())
+}
+
+fn calculate_additional_milliseconds(
+    config: &Config,
+    time_request_started: Instant,
+    minimum_remaining_seconds: u128,
+) -> u128 {
+    let elapsed_milliseconds = time_request_started.elapsed().as_millis();
+    let timeout_milliseconds = config.global.minimum_timeout_seconds.unwrap_or(0) as u128 * 1000;
+    let remaining_milliseconds = timeout_milliseconds.saturating_sub(elapsed_milliseconds);
+    let minimum_remaining_milliseconds = minimum_remaining_seconds * 1000;
+    if remaining_milliseconds < minimum_remaining_milliseconds {
+        minimum_remaining_milliseconds - remaining_milliseconds
+    } else {
+        0
+    }
+}
+
+fn has_timed_out(
+    config: &Config,
+    time_request_started: Instant,
+    additional_milliseconds: u128,
+) -> bool {
+    if let Some(timeout_seconds) = config.global.minimum_timeout_seconds {
+        let elapsed_milliseconds = time_request_started.elapsed().as_millis();
+        let timeout_milliseconds = timeout_seconds as u128 * 1000;
+        let can_timeout = timeout_milliseconds > 0;
+        let has_timed_out = elapsed_milliseconds >= timeout_milliseconds + additional_milliseconds;
+        if can_timeout && has_timed_out {
+            return true;
+        }
+    }
+    false
 }

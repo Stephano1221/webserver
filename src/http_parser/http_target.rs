@@ -21,10 +21,6 @@ impl HttpTarget {
         }
 
         let parameter_delimiter = '?';
-        // let filepath = match Filepath::from_str(target) {
-        //     Err(_) => None,
-        //     Ok(path) => Some(path),
-        // };
         let url_decoded_target = match urlencoding::decode(target) {
             Err(_) => return None,
             Ok(cow) => cow.into_owned(),
@@ -54,7 +50,7 @@ impl HttpTarget {
     /// # Safety
     /// The new `path` will be `Some`.
     pub fn set_filename(&mut self, filename: &str) {
-        let directory_delimiter = '/';
+        let directory_delimiter = std::path::MAIN_SEPARATOR;
         let mut new_path = match self.directory() {
             None => directory_delimiter.to_string(),
             Some(directory) => directory.to_owned(),
@@ -72,7 +68,7 @@ impl HttpTarget {
     /// The new `path` will be `Some`.
     pub fn set_directory(&mut self, directory: &str) {
         let filename = self.filename();
-        let directory_delimiter = '/';
+        let directory_delimiter = std::path::MAIN_SEPARATOR;
         let mut new_path = directory.to_owned();
         if filename.is_some() {
             if !new_path.ends_with(directory_delimiter) {
@@ -87,7 +83,7 @@ impl HttpTarget {
         if self.path.is_none() {
             return 0;
         }
-        let directory_delimiter = '/';
+        let directory_delimiter = std::path::MAIN_SEPARATOR;
         let full_path = &self.path.as_ref().unwrap()[..];
         full_path
             .chars()
@@ -96,7 +92,7 @@ impl HttpTarget {
     }
 
     pub fn n_directories(&self, directories: usize) -> Option<&str> {
-        let directory_delimiter = '/';
+        let directory_delimiter = std::path::MAIN_SEPARATOR;
         let full_path = &self.path.as_ref()?[..];
         let mut unprocessed_path = &full_path[..];
         let mut found_directories = 0;
@@ -125,7 +121,7 @@ impl HttpTarget {
     }
 
     fn get_directory_and_filename(&self) -> (Option<&str>, Option<&str>) {
-        let directory_delimiter = '/';
+        let directory_delimiter = std::path::MAIN_SEPARATOR;
         let filename_extension_delimiter = '.';
         match &self.path {
             None => (None, None),
